@@ -26,7 +26,7 @@ function TooltipBadge({ text }: { text: string }) {
         <Info className="w-3 h-3 text-rose-500" />
         <span className="text-[9px] font-semibold text-rose-500 leading-none">наведи</span>
       </div>
-      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-stone-800 text-white text-[11px] leading-relaxed whitespace-pre-wrap max-w-[320px] min-w-[200px] shadow-xl opacity-0 group-hover/badge:opacity-100 transition-opacity duration-200 z-50">
+      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-stone-800 text-white text-[11px] leading-relaxed whitespace-pre-wrap max-w-[420px] min-w-[200px] shadow-xl opacity-0 group-hover/badge:opacity-100 transition-opacity duration-200 z-50">
         {text}
         <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-2 h-2 rotate-45 bg-stone-800" />
       </div>
@@ -54,8 +54,8 @@ function RowItem({ item, totalSeconds, nestingOffset = 0 }: { item: SummaryItem;
       }`} />
 
       {/* Name + tooltip */}
-      <div className="flex-1 flex items-center gap-1.5 overflow-hidden">
-        <span className={`text-[13px] leading-tight ${isTotal ? "font-bold text-stone-800" : isSection ? "font-semibold text-stone-700" : "text-stone-600"}`}>
+      <div className="flex-1 flex items-center gap-1.5">
+        <span className={`text-[13px] leading-tight whitespace-pre-line ${isTotal ? "font-bold text-stone-800" : isSection ? "font-semibold text-stone-700" : "text-stone-600"}`}>
           {item.name}
         </span>
         {hasTooltip && <TooltipBadge text={item.description} />}
@@ -104,7 +104,7 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-[720px] p-0 gap-0 overflow-hidden rounded-xl max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-[850px] w-[95vw] p-0 gap-0 overflow-hidden rounded-xl max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className={`bg-gradient-to-r ${config.headerGradient} px-4 pt-4 pb-3 shrink-0`}>
           <div className="flex items-center justify-between">
