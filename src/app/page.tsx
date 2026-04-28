@@ -157,19 +157,16 @@ export default function Dashboard() {
           <div className="h-0.5 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-500" />
         </div>
 
-        {/* Action buttons row: Свод */}
-        <div className="flex items-center gap-3">
+        {/* Action button row: Свод (right-aligned) */}
+        <div className="flex justify-end">
           <button
             onClick={() => setSummaryOpen(true)}
-            className={`flex items-center gap-2.5 px-5 py-3 rounded-xl bg-gradient-to-r ${config.headerGradient} text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group`}
+            className={`flex items-center gap-3 px-6 py-2.5 rounded-lg bg-gradient-to-r ${config.headerGradient} text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] group`}
           >
-            <div className="w-8 h-8 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
-              <FileSpreadsheet className="w-4.5 h-4.5" />
-            </div>
-            <div className="text-left">
-              <span className="text-sm font-bold tracking-tight block leading-tight">Свод</span>
-              <span className="text-[10px] text-white/50 font-medium leading-tight block">Аналитика {config.label}</span>
-            </div>
+            <FileSpreadsheet className="w-4 h-4 opacity-90 group-hover:opacity-100 transition-opacity" />
+            <div className="w-px h-5 bg-white/20" />
+            <span className="text-sm font-bold tracking-tight">Свод</span>
+            <span className="text-[10px] text-white/50 font-medium bg-white/10 px-1.5 py-0.5 rounded">{config.label}</span>
           </button>
         </div>
 
