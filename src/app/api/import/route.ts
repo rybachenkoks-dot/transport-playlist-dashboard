@@ -74,12 +74,14 @@ export async function POST(request: NextRequest) {
 
     const results: { sheet: string; type: string; rows: number; kind: string }[] = [];
     let processedSheets = 0;
+    const allSheetNames = workbook.worksheets.map(w => w.name);
 
     for (const ws of workbook.worksheets) {
       const name = ws.name;
       const lower = name.toLowerCase();
       const isSummary = lower.includes("свод");
       const isPlaylist = lower.includes("плейлист");
+      console.log(`[Import] Sheet "${name}": summary=${isSummary}, playlist=${isPlaylist}`);
       if (!isSummary && !isPlaylist) continue;
 
       const type = detectType(name);
@@ -113,7 +115,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: "Не найдены листы с названиями «Плейлист» или «Свод»",
+        details: `Найденные листы: ${allSheetNames.join(", ")}`,
         results,
+      }, { status: 400 });
+    }
+
+    if (processedSheets === 0) {
+      return NextResponse.json({
+        success: false,
+        error: "В файле нет подходящих листов",
+        details: `Найденные листы: ${allSheetNames.length === 0 ? '(пустой файл)' : allSheetNames.join(", ")}`,
       }, { status: 400 });
     }
 
