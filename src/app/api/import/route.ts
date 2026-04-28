@@ -225,61 +225,144 @@ async function flushPlaylistBatch(type: string, rows: string[]) {
   console.log(`[Import] Flushed ${rows.length} playlist rows`);
 }
 
-// Import summary — multi-row INSERT without transaction (Turso compatible)
+// Import summary — supports real Excel layout:
+//   No text headers in row 1 (all null), data starts from row 2
+//   C1=level1 name, C2=level2 name, C3=level3 name/detail, C4=роликов*, C5=секунд, C6=процентов
+//   Also supports layout with headers: УР., КАТЕГОРИЯ, РОЛИКИ, СЕК., %
 async function importSummary(ws: any, headers: string[], type: string, results: any[], sheetName: string) {
-  // Flexible column detection — matches real Excel headers like УР., КАТЕГОРИЯ, РОЛИКИ, СЕК., %
-  const levelCol = headers.findIndex((h) => h && /^ур\.?$|уровень|level/i.test(h.trim()));
-  const nameColDef = headers.findIndex((h) => h && /категория|название|категори/i.test(h.trim()));
-  const descCol = headers.findIndex((h) => h && /описан|description|примечан/i.test(h.trim()));
-  const rollersCol = headers.findIndex((h) => h && /ролик|roller|роли/i.test(h.trim()));
-  const secondsCol = headers.findIndex((h) => h && /^сек\.?$|секунд|second|длительн|duration|секун/i.test(h.trim()));
-  const percentCol = headers.findIndex((h) => h && /^%$|процент|percent/i.test(h.trim()));
+  // Check if row 1 has actual text headers or is empty (real data starts row 2)
+  const hasTextHeaders = headers.some(h => h && h.length > 0 && !h.startsWith("["));
 
-  // Determine name column: use detected one, or fallback to column after level
-  let nameCol = nameColDef >= 0 ? nameColDef : (levelCol === 0 ? 1 : 0);
+  let rollersColIdx = -1;
+  let secondsColIdx = -1;
+  let percentColIdx = -1;
+  const dataStartRow = 2;
 
-  console.log(`[Import] Summary columns for "${sheetName}": level=${levelCol}(${headers[levelCol] || "N/A"}), name=${nameCol}(${headers[nameCol] || "N/A"}), rollers=${rollersCol}(${headers[rollersCol] || "N/A"}), seconds=${secondsCol}(${headers[secondsCol] || "N/A"}), percent=${percentCol}(${headers[percentCol] || "N/A"})`);
+  if (hasTextHeaders) {
+    rollersColIdx = headers.findIndex((h) => h && /ролик|roller|роли/i.test(h.trim()));
+    secondsColIdx = headers.findIndex((h) => h && /^сек\.?$|секунд|second|длительн|duration|секун/i.test(h.trim()));
+    percentColIdx = headers.findIndex((h) => h && /^%$|процент|percent/i.test(h.trim()));
+  } else {
+    // No text headers — detect numeric columns from first data rows
+    // Strategy: collect ALL column values across rows 2-5, then classify
+    const colSamples: Record<number, number[]> = {};
+    for (let r = 2; r <= Math.min(ws.rowCount, 6); r++) {
+      const row = ws.getRow(r);
+      row.eachCell({ includeEmpty: true }, (cell: any, cn: number) => {
+        const val = cellStr(cell);
+        const num = parseFloat(val);
+        if (isNaN(num)) return;
+        if (!colSamples[cn - 1]) colSamples[cn - 1] = [];
+        colSamples[cn - 1].push(num);
+      });
+    }
+
+    // Classify columns: find ones that are always 0-1 (percent) vs larger integers
+    const intCols: number[] = [];
+    const pctCols: number[] = [];
+    for (const [colStr, samples] of Object.entries(colSamples)) {
+      const col = parseInt(colStr);
+      const hasDecimal = samples.some(v => v !== Math.floor(v));
+      const maxVal = Math.max(...samples);
+      const minVal = Math.min(...samples);
+
+      if (hasDecimal && maxVal <= 1 && minVal >= 0) {
+        // Likely a percent column (0-1 floats)
+        pctCols.push(col);
+      } else if (maxVal >= 1) {
+        intCols.push(col);
+      }
+    }
+
+    // Sort by column position
+    intCols.sort((a, b) => a - b);
+    pctCols.sort((a, b) => a - b);
+
+    // If we have 3+ int columns, last one might be percent stored as decimal
+    // Typical: rollers (small) | seconds (large) | percent (0-1)
+    if (intCols.length >= 2) {
+      rollersColIdx = intCols[0];
+      secondsColIdx = intCols[1];
+    }
+    if (pctCols.length >= 1) {
+      percentColIdx = pctCols[0];
+    } else if (intCols.length >= 3) {
+      // Third column might be percent
+      const thirdColSamples = colSamples[String(intCols[2])];
+      if (thirdColSamples && thirdColSamples.every(v => v >= 0 && v <= 1)) {
+        percentColIdx = intCols[2];
+      }
+    }
+
+    // Ensure rollersCol < secondsCol (rollers are typically smaller numbers)
+    if (rollersColIdx > secondsColIdx) {
+      [rollersColIdx, secondsColIdx] = [secondsColIdx, rollersColIdx];
+    }
+  }
+
+  console.log(`[Import] Summary "${sheetName}": hasHeaders=${hasTextHeaders}, rollersCol=${rollersColIdx}, secondsCol=${secondsColIdx}, percentCol=${percentColIdx}`);
+
+  // Determine how many name columns exist (before the first numeric column)
+  // Real layout: 6-col sheets have 3 name cols, 5-col sheets have 2 name cols
+  const firstNumCol = Math.min(
+    ...[rollersColIdx, secondsColIdx, percentColIdx].filter(c => c >= 0),
+    Infinity
+  );
+  const nameColCount = isFinite(firstNumCol) ? firstNumCol : 3;
 
   const BATCH_SIZE = 100;
   let batchRows: string[] = [];
   let imported = 0;
 
-  for (let r = 2; r <= ws.rowCount; r++) {
+  for (let r = dataStartRow; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const vals: Record<number, string> = {};
-    row.eachCell({ includeEmpty: true }, (cell: any, cn: number) => { vals[cn - 1] = cellStr(cell); });
+    row.eachCell({ includeEmpty: true }, (cell: any, cn: number) => {
+      vals[cn - 1] = cellStr(cell);
+    });
 
-    const name = safeStr(vals[nameCol]);
-    if (!name) continue;
-
-    let level = 1;
-    if (levelCol >= 0) {
-      const rawLevel = vals[levelCol];
-      level = parseInt(rawLevel) || 1;
-      // If level column is numeric, use it; otherwise detect from font
-      if (isNaN(parseInt(rawLevel))) level = 1;
+    // Collect text values from name columns (before numeric cols)
+    const nameTexts: { col: number; text: string }[] = [];
+    for (let c = 0; c < nameColCount; c++) {
+      const t = safeStr(vals[c]);
+      if (t) nameTexts.push({ col: c, text: t });
     }
 
-    // Fallback: detect level from font styling if levelCol not found or not numeric
-    if (level === 1 && (levelCol < 0 || isNaN(parseInt(vals[levelCol])))) {
-      try {
-        const cell = row.getCell(nameCol + 1);
-        const bold = cell?.font?.bold;
-        if (name.toLowerCase().startsWith("итого")) level = 1;
-        else if (bold) level = 2;
-        else level = 3;
-      } catch {
-        level = 1;
-      }
+    if (nameTexts.length === 0) continue; // skip empty rows
+
+    // Determine level: which column has the text?
+    // C0 = level 1 (итого) or level 2 (section)
+    // C1 = level 3 (sub-section)
+    // C2 = level 4 (detail)
+    // Special case: row with "итого" repeated in multiple cols = level 1
+    const firstText = nameTexts[0];
+    let level: number;
+    let name: string;
+    let description = "";
+
+    if (firstText.col === 0 && firstText.text.toLowerCase().startsWith("итого")) {
+      level = 1;
+      name = "Итого";
+    } else if (firstText.col === 0) {
+      level = 2;
+      name = firstText.text;
+    } else if (firstText.col === 1) {
+      level = 3;
+      name = firstText.text;
+    } else if (firstText.col === 2) {
+      level = 4;
+      name = firstText.text;
+      description = firstText.text; // long detail text
+    } else {
+      level = 3;
+      name = firstText.text;
     }
 
-    const description = descCol >= 0 ? safeStr(vals[descCol]) : "";
-    const rollers = rollersCol >= 0 ? (parseInt(vals[rollersCol]) || 0) : 0;
-    const seconds = secondsCol >= 0 ? (parseInt(vals[secondsCol]) || 0) : 0;
+    const rollers = rollersColIdx >= 0 ? (parseInt(vals[rollersColIdx]) || 0) : 0;
+    const seconds = secondsColIdx >= 0 ? (parseInt(vals[secondsColIdx]) || 0) : 0;
     let percent = 0;
-    if (percentCol >= 0) {
-      const rawPercent = vals[percentCol].replace("%", "").replace(",", ".");
-      percent = parseFloat(rawPercent) || 0;
+    if (percentColIdx >= 0) {
+      percent = parseFloat(String(vals[percentColIdx]).replace("%", "").replace(",", ".")) || 0;
     }
     const manual = rollers > 0 || seconds > 0 ? 1 : 0;
 
