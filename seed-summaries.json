@@ -1,0 +1,506 @@
+[
+  {
+    "type": "transport",
+    "level": 1,
+    "categoryName": "Коммерческая программма",
+    "rollers": 302,
+    "seconds": 3220,
+    "percent": 35.74
+  },
+  {
+    "type": "transport",
+    "level": 2,
+    "categoryName": "Коммерческая реклама",
+    "rollers": 288,
+    "seconds": 2940,
+    "percent": 32.63
+  },
+  {
+    "type": "transport",
+    "level": 2,
+    "categoryName": "Собственная реклама",
+    "rollers": 14,
+    "seconds": 280,
+    "percent": 3.11
+  },
+  {
+    "type": "transport",
+    "level": 1,
+    "categoryName": "Социальная (некоммерческая) программа",
+    "rollers": 471,
+    "seconds": 5789,
+    "percent": 64.26
+  },
+  {
+    "type": "transport",
+    "level": 2,
+    "categoryName": "Некоммерческие партнерские программы",
+    "rollers": 471,
+    "seconds": 5789,
+    "percent": 64.26
+  },
+  {
+    "type": "mfc",
+    "level": 1,
+    "categoryName": "Коммерческая программма",
+    "rollers": 249,
+    "seconds": 3750,
+    "percent": 19.37
+  },
+  {
+    "type": "mfc",
+    "level": 2,
+    "categoryName": "Коммерческая реклама",
+    "rollers": 238,
+    "seconds": 3585,
+    "percent": 18.52
+  },
+  {
+    "type": "mfc",
+    "level": 2,
+    "categoryName": "Собственная реклама",
+    "rollers": 11,
+    "seconds": 165,
+    "percent": 0.85
+  },
+  {
+    "type": "mfc",
+    "level": 1,
+    "categoryName": "Социальная (некоммерческая) программа",
+    "rollers": 2101,
+    "seconds": 15610,
+    "percent": 80.63
+  },
+  {
+    "type": "mfc",
+    "level": 2,
+    "categoryName": "Программа МФЦ",
+    "rollers": 189,
+    "seconds": 3353,
+    "percent": 17.32
+  },
+  {
+    "type": "mfc",
+    "level": 2,
+    "categoryName": "Партнерская программа",
+    "rollers": 1912,
+    "seconds": 12257,
+    "percent": 63.31
+  },
+  {
+    "type": "mfc",
+    "level": 2,
+    "categoryName": "Культура",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  },
+  {
+    "type": "mfc",
+    "level": 2,
+    "categoryName": "Новости",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  },
+  {
+    "type": "metro",
+    "level": 1,
+    "categoryName": "Коммерческая программма",
+    "rollers": 822,
+    "seconds": 5848,
+    "percent": 64.92
+  },
+  {
+    "type": "metro",
+    "level": 2,
+    "categoryName": "Коммерческая реклама",
+    "rollers": 816,
+    "seconds": 5758,
+    "percent": 63.92
+  },
+  {
+    "type": "metro",
+    "level": 2,
+    "categoryName": "Собственная реклама",
+    "rollers": 6,
+    "seconds": 90,
+    "percent": 1.0
+  },
+  {
+    "type": "metro",
+    "level": 1,
+    "categoryName": "Социальная (некоммерческая) программа",
+    "rollers": 451,
+    "seconds": 3160,
+    "percent": 35.08
+  },
+  {
+    "type": "metro",
+    "level": 2,
+    "categoryName": "Партнерская программа",
+    "rollers": 451,
+    "seconds": 3160,
+    "percent": 35.08
+  },
+  {
+    "type": "metro",
+    "level": 2,
+    "categoryName": "Финансовая грамотность",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  },
+  {
+    "type": "metro",
+    "level": 2,
+    "categoryName": "Культура",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  },
+  {
+    "type": "metro",
+    "level": 2,
+    "categoryName": "Новостное ТВ",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  },
+  {
+    "type": "lift",
+    "level": 1,
+    "categoryName": "Коммерческая программма",
+    "rollers": 113,
+    "seconds": 735,
+    "percent": 16.14
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Коммерческая реклама",
+    "rollers": 112,
+    "seconds": 720,
+    "percent": 15.81
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Собственная реклама",
+    "rollers": 1,
+    "seconds": 15,
+    "percent": 0.33
+  },
+  {
+    "type": "lift",
+    "level": 1,
+    "categoryName": "Социальная (некоммерческая) программа",
+    "rollers": 408,
+    "seconds": 3818,
+    "percent": 83.86
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Фонд народного единства",
+    "rollers": 7,
+    "seconds": 35,
+    "percent": 0.77
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Служба по контракту:\n   - Войска беспилотных систем;\n   - Стань героем нашего времени",
+    "rollers": 60,
+    "seconds": 420,
+    "percent": 9.22
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Росгвардия: Набор на службу февраль 2026",
+    "rollers": 19,
+    "seconds": 105,
+    "percent": 2.31
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "УМВД РФ по НН:\n   - Центр Рекрутинга с 02.2026;\n   - Отдел полиции 4 (2 ролика) с 02.2026.",
+    "rollers": 31,
+    "seconds": 345,
+    "percent": 7.58
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "ООО \"Экологические проекты\": \n   - Курсы водителей трамваев;        \n   - Приглашение на работу;\n   - Вакансии",
+    "rollers": 13,
+    "seconds": 70,
+    "percent": 1.54
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Правительство НО:\n    - Выплаты при рождении ребенка (3 из 4 роликов);\n    - Подарок новорожденному от губернатора;\n    - Бесплатный Wi-Fi в НО;\n    - Мессенджер Max;\n    - Нацпроект Кадры",
+    "rollers": 61,
+    "seconds": 775,
+    "percent": 17.02
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Росприроднадзор:\n   - Экология - дело каждого",
+    "rollers": 15,
+    "seconds": 150,
+    "percent": 3.29
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "ГЖИ НО. Госуслуги: \n   - Дом (2 ролика)",
+    "rollers": 27,
+    "seconds": 135,
+    "percent": 2.97
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "МФЦ:\n   - Работа в МФЦ",
+    "rollers": 10,
+    "seconds": 60,
+    "percent": 1.32
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "НПАТ: \n   - Вакансии (3 ролика)",
+    "rollers": 39,
+    "seconds": 273,
+    "percent": 6.0
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Нижегородэлектротранс: \n   - Стань водителем электробуса (2 макета)",
+    "rollers": 16,
+    "seconds": 85,
+    "percent": 1.87
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "ПНО новости:\n   - 1. ПНО новости. Союз театральных деятелей с 24.04.26;\n   - 2. ПНО новости. Временные пешеходные маршруты с 24.04.26;\n   - 3. ПНО новости. 849 памятных мест с 24.04.26;\n   - 4. ПНО новости.  Торги по станции аэрации 24.04.26",
+    "rollers": 20,
+    "seconds": 400,
+    "percent": 8.79
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Банк России:\n   - Представляются кем угодно;\n   - Сервис \"второй руки\"; \n   - Переводят звонки между ведомствами;\n   - Период охлаждения (кредиты)",
+    "rollers": 23,
+    "seconds": 315,
+    "percent": 6.92
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Объединенный Коммунальный Коммутатор\" (ОКО)\n(5 роликов)",
+    "rollers": 15,
+    "seconds": 115,
+    "percent": 2.53
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "ДУК (Советский, Нижегородский, Канавинский,\nПриокский, Московский, Кстово)",
+    "rollers": 11,
+    "seconds": 75,
+    "percent": 1.65
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Верховный суд РФ:\n   - Верховный суд РФ в МАХ с 04.2026",
+    "rollers": 13,
+    "seconds": 65,
+    "percent": 1.43
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Федерация КУДО России:\n   - Кубок России по КУДО 17.05.2026",
+    "rollers": 13,
+    "seconds": 260,
+    "percent": 5.71
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Минспорта НО: ГТО-95",
+    "rollers": 8,
+    "seconds": 70,
+    "percent": 1.54
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Минцифры НО \"Бесплатное образование в ИТ\"",
+    "rollers": 7,
+    "seconds": 65,
+    "percent": 1.43
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Культура",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  },
+  {
+    "type": "lift",
+    "level": 2,
+    "categoryName": "Новости",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  },
+  {
+    "type": "kd",
+    "level": 1,
+    "categoryName": "Коммерческая программма",
+    "rollers": 81,
+    "seconds": 750,
+    "percent": 62.5
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Коммерческая реклама",
+    "rollers": 79,
+    "seconds": 720,
+    "percent": 60.0
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Собственная реклама",
+    "rollers": 2,
+    "seconds": 30,
+    "percent": 2.5
+  },
+  {
+    "type": "kd",
+    "level": 1,
+    "categoryName": "Социальная (некоммерческая) программа",
+    "rollers": 48,
+    "seconds": 450,
+    "percent": 37.5
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Служба по контракту:\n   - Войска беспилотных систем;\n   - Стань героем нашего времени",
+    "rollers": 8,
+    "seconds": 40,
+    "percent": 3.33
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Росгвардия\n   - Набор на службу февраль 2026",
+    "rollers": 4,
+    "seconds": 20,
+    "percent": 1.67
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Правительство НО:\n   - Выплаты при рождении ребенка (2 ролика из 4); \n   - Подарок новорожденному от губернатора;\n   - Бесплатный Wi-Fi в НО;\n   - Нацпроект Кадры",
+    "rollers": 8,
+    "seconds": 90,
+    "percent": 7.5
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "НПАТ:\n   - Вакансии",
+    "rollers": 6,
+    "seconds": 30,
+    "percent": 2.5
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Нижегородские канатные дороги:\n   - Справочная информация",
+    "rollers": 4,
+    "seconds": 20,
+    "percent": 1.67
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Минспорта НО: ГТО-95",
+    "rollers": 2,
+    "seconds": 10,
+    "percent": 0.83
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "ПНО новости:\n   - 1. ПНО новости. Союз театральных деятелей с 24.04.26;\n   - 2. ПНО новости. Временные пешеходные маршруты с 24.04.26;\n   - 3. ПНО новости. 849 памятных мест с 24.04.26;\n   - 4. ПНО новости.  Торги по станции аэрации 24.04.26",
+    "rollers": 4,
+    "seconds": 80,
+    "percent": 6.67
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Урбантех:  \n   - Вакансии на канатной дороге;\n  - Будь в курсе",
+    "rollers": 4,
+    "seconds": 30,
+    "percent": 2.5
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Минздрав НО:\n    - Диспансеризация;\n    - Алкоголь;\n    - Курение;\n     - Инфаркт;\n     - Инсульт.",
+    "rollers": 2,
+    "seconds": 30,
+    "percent": 2.5
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Верховный суд РФ:\n   - Верховный суд РФ в МАХ с 04.2026",
+    "rollers": 2,
+    "seconds": 60,
+    "percent": 5.0
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Нижегородэлектротранс: \n   - Вакансии в электробусах",
+    "rollers": 4,
+    "seconds": 40,
+    "percent": 3.33
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Культура",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  },
+  {
+    "type": "kd",
+    "level": 2,
+    "categoryName": "Новости",
+    "rollers": 0,
+    "seconds": 0,
+    "percent": 0
+  }
+]
