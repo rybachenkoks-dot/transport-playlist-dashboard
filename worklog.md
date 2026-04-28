@@ -59,8 +59,8 @@ Work Log:
 - Увеличен BATCH_SIZE с 200 до 500 строк для уменьшения количества сетевых round-trip к Turso
 - Добавлен AbortController с таймаутом 5 минут в ImportDialog (предотвращает обрыв больших файлов)
 - Добавлено сообщение "Это может занять несколько минут" при загрузке
-- Настроен git remote origin с новым токеном (REDACTED)
-- Запушены изменения: git push origin HEAD:main --force (commit 64d4921)
+- Настроен git remote origin с GitHub personal access token
+- Запушены изменения: git push origin HEAD:main --force
 - Render автоматически задеплоит новое приложение
 
 Stage Summary:
