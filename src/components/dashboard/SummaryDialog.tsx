@@ -54,8 +54,8 @@ function RowItem({ item, totalSeconds, nestingOffset = 0 }: { item: SummaryItem;
       }`} />
 
       {/* Name + tooltip */}
-      <div className="flex-1 min-w-0 flex items-center gap-1.5">
-        <span className={`truncate text-[13px] leading-tight ${isTotal ? "font-bold text-stone-800" : isSection ? "font-semibold text-stone-700" : "text-stone-600"}`}>
+      <div className="flex-1 flex items-center gap-1.5 overflow-hidden">
+        <span className={`text-[13px] leading-tight ${isTotal ? "font-bold text-stone-800" : isSection ? "font-semibold text-stone-700" : "text-stone-600"}`}>
           {item.name}
         </span>
         {hasTooltip && <TooltipBadge text={item.description} />}
@@ -104,7 +104,7 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-[480px] p-0 gap-0 overflow-hidden rounded-xl max-h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-[720px] p-0 gap-0 overflow-hidden rounded-xl max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className={`bg-gradient-to-r ${config.headerGradient} px-4 pt-4 pb-3 shrink-0`}>
           <div className="flex items-center justify-between">
