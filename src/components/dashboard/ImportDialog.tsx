@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef } from "react";
 import { toast } from "sonner";
@@ -27,11 +27,11 @@ interface ImportDialogProps {
 }
 
 const typeLabel: Record<string, string> = {
-  transport: "\u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442",
-  mfc: "\u041c\u0424\u0426",
-  metro: "\u041c\u0435\u0442\u0440\u043e",
-  lift: "\u041b\u0438\u0444\u0442",
-  kd: "\u041a\u0414",
+  transport: "Транспорт",
+  mfc: "МФЦ",
+  metro: "Метро",
+  lift: "Лифт",
+  kd: "КД",
 };
 
 export function ImportDialog({ open, onClose, config, onImported }: ImportDialogProps) {
@@ -41,30 +41,60 @@ export function ImportDialog({ open, onClose, config, onImported }: ImportDialog
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ImportResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const reset = () => { setFile(null); setDragOver(false); setUploading(false); setProgress(0); setResults(null); setError(null); };
+  const reset = () => { setFile(null); setDragOver(false); setUploading(false); setProgress(0); setResults(null); setError(null); setErrorDetails(null); };
   const handleClose = () => { reset(); onClose(); };
 
   const handleFile = (f: File) => {
-    if (!f.name.match(/\.xlsx?$/i)) { toast.error("\u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430, \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u0444\u0430\u0439\u043b .xlsx \u0438\u043b\u0438 .xls"); return; }
-    setFile(f); setResults(null); setError(null);
+    if (!f.name.match(/\.xlsx?$/i)) { toast.error("Пожалуйста, загрузите файл .xlsx или .xls"); return; }
+    if (f.size > 50 * 1024 * 1024) { toast.error("Файл слишком большой (максимум 50 МБ)"); return; }
+    setFile(f); setResults(null); setError(null); setErrorDetails(null);
   };
 
   const handleUpload = async () => {
     if (!file) return;
-    setUploading(true); setProgress(10); setError(null); setResults(null);
+    setUploading(true); setProgress(10); setError(null); setErrorDetails(null); setResults(null);
     try {
       const fd = new FormData(); fd.append("file", file); setProgress(30);
-      const res = await fetch("/api/import", { method: "POST", body: fd }); setProgress(80);
-      const data = await res.json(); setProgress(100);
-      if (!res.ok) throw new Error(data.error || data.details || "\u041e\u0448\u0438\u0431\u043a\u0430");
+
+      let res: Response;
+      try {
+        res = await fetch("/api/import", { method: "POST", body: fd });
+      } catch (networkError) {
+        throw new Error("Сетевая ошибка: нет подключения к серверу. Проверьте интернет и попробуйте снова.");
+      }
+
+      setProgress(80);
+
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("Сервер вернул некорректный ответ. Попробуйте ещё раз.");
+      }
+
+      setProgress(100);
+
+      if (!res.ok) {
+        const errorMsg = data.error || "Неизвестная ошибка сервера";
+        const errorDetails = data.details || "";
+        throw new Error(errorMsg + (errorDetails ? `\n${errorDetails}` : ""));
+      }
+
       setResults(data.results || []);
       const totalRows = (data.results || []).reduce((s: number, r: ImportResult) => s + r.rows, 0);
-      toast.success(`\u0418\u043c\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u043e ${totalRows} \u0441\u0442\u0440\u043e\u043a`);
+      toast.success(`Импортировано ${totalRows} строк`);
       onImported();
-    } catch (e) { setError(e instanceof Error ? e.message : "\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430"); toast.error("\u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043c\u043f\u043e\u0440\u0442\u0430"); }
-    finally { setUploading(false); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Неизвестная ошибка";
+      // Split error and details
+      const lines = message.split("\n");
+      setError(lines[0]);
+      setErrorDetails(lines.length > 1 ? lines.slice(1).join("\n") : null);
+      toast.error("Ошибка импорта");
+    } finally { setUploading(false); }
   };
 
   return (
@@ -74,11 +104,11 @@ export function ImportDialog({ open, onClose, config, onImported }: ImportDialog
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2 text-sm font-semibold">
               <Upload className="w-4 h-4" />
-              {"\u0418\u043c\u043f\u043e\u0440\u0442 \u0438\u0437 Excel"}
+              Импорт из Excel
             </DialogTitle>
           </DialogHeader>
           <p className="text-[11px] text-white/40 mt-1">
-            {"\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u0444\u0430\u0439\u043b \u0441 \u043b\u0438\u0441\u0442\u0430\u043c\u0438 \u00ab\u041f\u043b\u0435\u0439\u043b\u0438\u0441\u0442\u00bb \u0438/\u0438\u043b\u0438 \u00ab\u0421\u0432\u043e\u0434\u00bb"}
+            Загрузите файл с листами «Плейлист» и/или «Свод»
           </p>
         </div>
         <div className="p-5 space-y-4">
@@ -95,14 +125,14 @@ export function ImportDialog({ open, onClose, config, onImported }: ImportDialog
                 <FileSpreadsheet className="w-8 h-8 text-emerald-600" />
                 <div className="text-left">
                   <p className="text-sm font-medium text-stone-700">{file.name}</p>
-                  <p className="text-xs text-stone-400">{(file.size / 1024).toFixed(1)} {"\u041a\u0411"}</p>
+                  <p className="text-xs text-stone-400">{(file.size / 1024).toFixed(1)} КБ</p>
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); setFile(null); setResults(null); }} className="ml-2 text-stone-400 hover:text-stone-600"><X className="w-4 h-4" /></button>
               </div>
             ) : (
               <div>
                 <Upload className="w-8 h-8 text-stone-300 mx-auto mb-2" />
-                <p className="text-sm text-stone-500">{"\u041f\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0444\u0430\u0439\u043b \u0441\u044e\u0434\u0430 \u0438\u043b\u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u0434\u043b\u044f \u0432\u044b\u0431\u043e\u0440\u0430"}</p>
+                <p className="text-sm text-stone-500">Перетащите файл сюда или нажмите для выбора</p>
                 <p className="text-xs text-stone-400 mt-1">.xlsx, .xls</p>
               </div>
             )}
@@ -112,20 +142,25 @@ export function ImportDialog({ open, onClose, config, onImported }: ImportDialog
               <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-stone-600 to-stone-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
               </div>
-              <p className="text-xs text-muted-foreground text-center">{"\u0418\u043c\u043f\u043e\u0440\u0442 \u0434\u0430\u043d\u043d\u044b\u0445..."}</p>
+              <p className="text-xs text-muted-foreground text-center">Импорт данных...</p>
             </div>
           )}
           {error && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-100">
-              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-red-700">{error}</p>
+            <div className="flex flex-col gap-1 p-3 rounded-lg bg-red-50 border border-red-100">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-red-700 font-medium">{error}</p>
+              </div>
+              {errorDetails && (
+                <p className="text-[11px] text-red-500 ml-6 whitespace-pre-wrap font-mono">{errorDetails}</p>
+              )}
             </div>
           )}
           {results && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-100">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <p className="text-sm font-medium text-emerald-700">{"\u0418\u043c\u043f\u043e\u0440\u0442 \u0437\u0430\u0432\u0435\u0440\u0448\u0451\u043d \u0443\u0441\u043f\u0435\u0448\u043d\u043e"}</p>
+                <p className="text-sm font-medium text-emerald-700">Импорт завершён успешно</p>
               </div>
               <div className="border border-stone-100 rounded-lg divide-y divide-stone-50">
                 {results.map((r, i) => (
@@ -134,19 +169,19 @@ export function ImportDialog({ open, onClose, config, onImported }: ImportDialog
                       <FileSpreadsheet className="w-3.5 h-3.5 text-stone-400" />
                       <span className="text-xs font-medium text-stone-700">{r.sheet}</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-stone-100 text-stone-500">
-                        {r.kind === "playlist" ? "\u041f\u043b\u0435\u0439\u043b\u0438\u0441\u0442" : "\u0421\u0432\u043e\u0434"} \u00b7 {typeLabel[r.type] || r.type}
+                        {r.kind === "playlist" ? "Плейлист" : "Свод"} · {typeLabel[r.type] || r.type}
                       </span>
                     </div>
-                    <span className="text-xs font-bold tabular-nums text-stone-600">{r.rows} {"\u0441\u0442\u0440\u043e\u043a"}</span>
+                    <span className="text-xs font-bold tabular-nums text-stone-600">{r.rows} строк</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleClose} className="flex-1 text-xs" disabled={uploading}>{"\u0417\u0430\u043a\u0440\u044b\u0442\u044c"}</Button>
+            <Button variant="outline" onClick={handleClose} className="flex-1 text-xs" disabled={uploading}>Закрыть</Button>
             <Button onClick={handleUpload} disabled={!file || uploading} className={`flex-1 text-xs text-white ${config.buttonGradient}`}>
-              {uploading ? "\u0418\u043c\u043f\u043e\u0440\u0442..." : "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c"}
+              {uploading ? "Импорт..." : "Загрузить"}
             </Button>
           </div>
         </div>

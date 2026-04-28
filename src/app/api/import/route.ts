@@ -1,4 +1,4 @@
-﻿import { db } from "@/lib/db";
+import { db, ensureTables } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
 const TYPE_KEYWORDS: [string, string][] = [
@@ -11,12 +11,12 @@ const TYPE_KEYWORDS: [string, string][] = [
 ];
 
 const COL_MAP: Record<string, string[]> = {
-  originalIndex: ["\u2116", "n", "index", "\u043d\u043e\u043c\u0435\u0440", "\u043f/\u043f"],
-  location: ["\u0442\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442", "\u043c\u0444\u0446", "\u043c\u0435\u0442\u0440\u043e", "\u0441\u0442\u0430\u043d\u0446\u0438\u044f", "\u043b\u0438\u0444\u0442", "\u043d\u043f", "\u043a\u0434"],
-  category: ["\u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f", "\u0431\u043b\u043e\u043a"],
-  client: ["\u0437\u0430\u043a\u0430\u0437\u0447\u0438\u043a", "client"],
-  mediaObject: ["\u043c\u0435\u0434\u0438\u0430\u043e\u0431\u044a\u0435\u043a\u0442", "\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0440\u043e\u043b\u0438\u043a\u0430", "\u0440\u043e\u043b\u0438\u043a", "\u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435", "\u043c\u0435\u0434\u0438\u0430"],
-  duration: ["\u0445\u0440\u043e\u043d\u043e", "\u0434\u043b\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c", "duration", "\u0441\u0435\u043a", "\u0441\u0435\u043a\u0443\u043d\u0434\u044b"],
+  originalIndex: ["№", "n", "index", "номер", "п/п"],
+  location: ["транспорт", "мфц", "метро", "станция", "лифт", "нп", "кд"],
+  category: ["категория", "блок"],
+  client: ["заказчик", "client"],
+  mediaObject: ["медиаобъект", "название ролика", "ролик", "название", "медиа"],
+  duration: ["хроно", "длительность", "duration", "сек", "секунды"],
 };
 
 function detectType(name: string): string | null {
@@ -51,29 +51,37 @@ function cellStr(cell: any): string {
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureTables();
+
     const formData = await request.formData();
     const file = formData.get("file");
     if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: "\u0424\u0430\u0439\u043b \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d" }, { status: 400 });
+      return NextResponse.json({ error: "Файл не найден" }, { status: 400 });
     }
+
+    console.log(`[Import] File: ${file.name}, Size: ${(file.size / 1024).toFixed(1)} KB`);
 
     const ExcelJS = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     const buffer = await file.arrayBuffer();
     await workbook.xlsx.load(buffer);
 
+    console.log(`[Import] Sheets: ${workbook.worksheets.map(w => w.name).join(", ")}`);
+
     const results: { sheet: string; type: string; rows: number; kind: string }[] = [];
+    let processedSheets = 0;
 
     for (const ws of workbook.worksheets) {
       const name = ws.name;
       const lower = name.toLowerCase();
-      const isSummary = lower.includes("\u0441\u0432\u043e\u0434");
-      const isPlaylist = lower.includes("\u043f\u043b\u0435\u0439\u043b\u0438\u0441\u0442");
+      const isSummary = lower.includes("свод");
+      const isPlaylist = lower.includes("плейлист");
       if (!isSummary && !isPlaylist) continue;
 
       const type = detectType(name);
       if (!type) {
-        results.push({ sheet: name, type: "\u043d\u0435 \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u0451\u043d", rows: 0, kind: isSummary ? "summary" : "playlist" });
+        results.push({ sheet: name, type: "не определён", rows: 0, kind: isSummary ? "summary" : "playlist" });
+        console.log(`[Import] Skipped sheet "${name}" — type not detected`);
         continue;
       }
 
@@ -82,17 +90,37 @@ export async function POST(request: NextRequest) {
         headers[cn - 1] = cellStr(cell);
       });
 
-      if (isPlaylist) {
-        await importPlaylist(ws, headers, type, results, name);
-      } else {
-        await importSummary(ws, headers, type, results, name);
+      console.log(`[Import] Processing "${name}" as ${isSummary ? "summary" : "playlist"} (${type}), headers: ${headers.join(" | ")}`);
+
+      try {
+        if (isPlaylist) {
+          await importPlaylist(ws, headers, type, results, name);
+        } else {
+          await importSummary(ws, headers, type, results, name);
+        }
+        processedSheets++;
+      } catch (sheetError) {
+        console.error(`[Import] Error in sheet "${name}":`, sheetError);
+        results.push({ sheet: name, type, rows: 0, kind: isSummary ? "summary" : "playlist" });
       }
+    }
+
+    if (processedSheets === 0 && results.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: "Не найдены листы с названиями «Плейлист» или «Свод»",
+        results,
+      }, { status: 400 });
     }
 
     return NextResponse.json({ success: true, results });
   } catch (error) {
     console.error("[Import] Error:", error);
-    return NextResponse.json({ error: "\u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043c\u043f\u043e\u0440\u0442\u0430", details: String(error) }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    const cleanMsg = msg.includes("LIBSQL_ERROR")
+      ? "Ошибка базы данных: проверьте подключение к Turso"
+      : msg.length > 200 ? msg.substring(0, 200) + "..." : msg;
+    return NextResponse.json({ error: "Ошибка импорта", details: cleanMsg }, { status: 500 });
   }
 }
 
@@ -106,22 +134,12 @@ async function importPlaylist(ws: any, headers: string[], type: string, results:
     duration: findCol(headers, "duration"),
   };
 
-  await db.execute(`CREATE TABLE IF NOT EXISTS "Playlist" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "originalIndex" INTEGER NOT NULL DEFAULT 0,
-    "type" TEXT NOT NULL DEFAULT '',
-    "location" TEXT NOT NULL DEFAULT '',
-    "category" TEXT NOT NULL DEFAULT '',
-    "client" TEXT NOT NULL DEFAULT '',
-    "mediaObject" TEXT NOT NULL DEFAULT '',
-    "duration" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TEXT NOT NULL DEFAULT '',
-    "updatedAt" TEXT NOT NULL DEFAULT ''
-  )`);
+  console.log(`[Import] Column mapping:`, cols);
 
   await db.execute({ sql: `DELETE FROM "Playlist" WHERE "type" = :type`, args: { type } });
 
   let imported = 0;
+
   for (let r = 2; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const vals: Record<number, string> = {};
@@ -143,38 +161,23 @@ async function importPlaylist(ws: any, headers: string[], type: string, results:
     imported++;
   }
 
+  console.log(`[Import] Imported ${imported} playlist rows for ${type}`);
   results.push({ sheet: sheetName, type, rows: imported, kind: "playlist" });
 }
 
 async function importSummary(ws: any, headers: string[], type: string, results: any[], sheetName: string) {
-  const levelCol = headers.findIndex((h) => /\u0443\u0440\u043e\u0432\u0435\u043d\u044c|level/i.test(h.trim()));
-  const descCol = headers.findIndex((h) => /\u043e\u043f\u0438\u0441\u0430\u043d|description/i.test(h.trim()));
-  const rollersCol = headers.findIndex((h) => /\u0440\u043e\u043b\u0438\u043a|roller/i.test(h.trim()));
-  const secondsCol = headers.findIndex((h) => /\u0441\u0435\u043a\u0443\u043d\u0434|second|\u0434\u043b\u0438\u0442\u0435\u043b\u044c\u043d|duration/i.test(h.trim()));
+  const levelCol = headers.findIndex((h) => /уровень|level/i.test(h.trim()));
+  const descCol = headers.findIndex((h) => /описан|description/i.test(h.trim()));
+  const rollersCol = headers.findIndex((h) => /ролик|roller/i.test(h.trim()));
+  const secondsCol = headers.findIndex((h) => /секунд|second|длительн|duration/i.test(h.trim()));
 
   let nameCol = 0;
   if (levelCol === 0) nameCol = 1;
 
-  await db.execute(`CREATE TABLE IF NOT EXISTS "PlaylistSummary" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-    "type" TEXT NOT NULL DEFAULT '',
-    "level" INTEGER NOT NULL DEFAULT 1,
-    "categoryName" TEXT NOT NULL DEFAULT '',
-    "description" TEXT NOT NULL DEFAULT '',
-    "matchField" TEXT DEFAULT NULL,
-    "matchMode" TEXT DEFAULT NULL,
-    "matchValue" TEXT DEFAULT NULL,
-    "rollers" INTEGER NOT NULL DEFAULT 0,
-    "seconds" INTEGER NOT NULL DEFAULT 0,
-    "percent" REAL NOT NULL DEFAULT 0,
-    "manualValues" INTEGER NOT NULL DEFAULT 0,
-    "createdAt" TEXT NOT NULL DEFAULT '',
-    "updatedAt" TEXT NOT NULL DEFAULT ''
-  )`);
-
   await db.execute({ sql: `DELETE FROM "PlaylistSummary" WHERE "type" = :type`, args: { type } });
 
   let imported = 0;
+
   for (let r = 2; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const vals: Record<number, string> = {};
@@ -190,7 +193,7 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
       const cell = row.getCell(nameCol + 1);
       const indent = cell.font?.indent || 0;
       const bold = cell.font?.bold;
-      if (name.toLowerCase().startsWith("\u0438\u0442\u043e\u0433\u043e")) level = 1;
+      if (name.toLowerCase().startsWith("итого")) level = 1;
       else if (indent === 0 && bold) level = 2;
       else if (indent >= 2) level = 4;
       else level = 3;
@@ -208,6 +211,7 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
     imported++;
   }
 
+  // Apply filter templates from summary-structure.ts
   try {
     const { SUMMARY_STRUCTURES } = await import("@/components/dashboard/summary-structure");
     const structure = (SUMMARY_STRUCTURES as any[]).find((s) => s.type === type);
@@ -224,5 +228,6 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
     console.warn("[Import] Template match warning:", e);
   }
 
+  console.log(`[Import] Imported ${imported} summary rows for ${type}`);
   results.push({ sheet: sheetName, type, rows: imported, kind: "summary" });
 }
