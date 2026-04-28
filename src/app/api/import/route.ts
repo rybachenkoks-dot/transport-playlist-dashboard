@@ -30,7 +30,7 @@ function detectType(name: string): string | null {
 function findCol(headers: string[], field: string): number {
   const cands = COL_MAP[field] || [];
   for (const c of cands) {
-    const i = headers.findIndex((h) => h.toLowerCase().trim().includes(c));
+    const i = headers.findIndex((h) => h && h.toLowerCase().trim().includes(c));
     if (i >= 0) return i;
   }
   return -1;
@@ -45,8 +45,13 @@ function cellStr(cell: any): string {
   if (typeof v === "object" && v !== null) {
     if (v.richText) return v.richText.map((r: any) => r.text || "").join("").trim();
     if (v.result !== undefined) return String(v.result).trim();
+    if (v.text) return String(v.text).trim();
   }
   return String(v).trim();
+}
+
+function safeStr(val: string | undefined | null, fallback: string = ""): string {
+  return (val || "").trim();
 }
 
 function escapeSql(str: string): string {
@@ -143,7 +148,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Fast import using a single multi-row INSERT inside a transaction
+// Import playlist — multi-row INSERT without transaction (Turso compatible)
 async function importPlaylist(ws: any, headers: string[], type: string, results: any[], sheetName: string) {
   const cols = {
     originalIndex: findCol(headers, "originalIndex"),
@@ -156,8 +161,8 @@ async function importPlaylist(ws: any, headers: string[], type: string, results:
 
   console.log(`[Import] Column mapping:`, cols);
 
-  // Collect all rows in memory first
-  const rows: string[] = [];
+  const BATCH_SIZE = 100;
+  let batchRows: string[] = [];
   let imported = 0;
 
   for (let r = 2; r <= ws.rowCount; r++) {
@@ -165,61 +170,51 @@ async function importPlaylist(ws: any, headers: string[], type: string, results:
     const vals: Record<number, string> = {};
     row.eachCell({ includeEmpty: true }, (cell: any, cn: number) => { vals[cn - 1] = cellStr(cell); });
 
-    const client = cols.client >= 0 ? vals[cols.client] : "";
-    const media = cols.mediaObject >= 0 ? vals[cols.mediaObject] : "";
+    const client = cols.client >= 0 ? safeStr(vals[cols.client]) : "";
+    const media = cols.mediaObject >= 0 ? safeStr(vals[cols.mediaObject]) : "";
     if (!client && !media) continue;
 
     const idx = cols.originalIndex >= 0 ? (parseInt(vals[cols.originalIndex]) || imported + 1) : imported + 1;
-    const location = cols.location >= 0 ? vals[cols.location] : "";
-    const category = cols.category >= 0 ? vals[cols.category] : "";
+    const location = cols.location >= 0 ? safeStr(vals[cols.location]) : "";
+    const category = cols.category >= 0 ? safeStr(vals[cols.category]) : "";
     const dur = cols.duration >= 0 ? (parseInt(vals[cols.duration]) || 0) : 0;
 
-    rows.push(`(${idx},'${escapeSql(type)}','${escapeSql(location)}','${escapeSql(category)}','${escapeSql(client)}','${escapeSql(media)}',${dur},datetime('now'),datetime('now'))`);
+    batchRows.push(`(${idx},'${escapeSql(type)}','${escapeSql(location)}','${escapeSql(category)}','${escapeSql(client)}','${escapeSql(media)}',${dur},datetime('now'),datetime('now'))`);
     imported++;
-  }
 
-  if (imported === 0) {
-    console.log(`[Import] No rows to import for ${type}`);
-    results.push({ sheet: sheetName, type, rows: 0, kind: "playlist" });
-    return;
-  }
-
-  // Execute as a single transaction with batched INSERT statements
-  const BATCH_SIZE = 500;
-  console.log(`[Import] Inserting ${imported} rows in ${Math.ceil(rows.length / BATCH_SIZE)} batches (batch_size=${BATCH_SIZE})...`);
-
-  await db.execute({ sql: `DELETE FROM "Playlist" WHERE "type" = :type`, args: { type } });
-  await db.execute("BEGIN");
-
-  try {
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE).join(",");
-      await db.execute({
-        sql: `INSERT INTO "Playlist" ("originalIndex","type","location","category","client","mediaObject","duration","createdAt","updatedAt") VALUES ${batch}`,
-        args: {},
-      });
+    if (batchRows.length >= BATCH_SIZE) {
+      await flushPlaylistBatch(type, batchRows);
+      batchRows = [];
     }
-    await db.execute("COMMIT");
-  } catch (e) {
-    await db.execute("ROLLBACK").catch(() => {});
-    throw e;
+  }
+
+  // Flush remaining
+  if (batchRows.length > 0) {
+    await flushPlaylistBatch(type, batchRows);
   }
 
   console.log(`[Import] Imported ${imported} playlist rows for ${type}`);
   results.push({ sheet: sheetName, type, rows: imported, kind: "playlist" });
 }
 
-// Fast summary import using transaction
+async function flushPlaylistBatch(type: string, rows: string[]) {
+  const sql = `INSERT INTO "Playlist" ("originalIndex","type","location","category","client","mediaObject","duration","createdAt","updatedAt") VALUES ${rows.join(",")}`;
+  await db.execute({ sql, args: {} });
+  console.log(`[Import] Flushed ${rows.length} playlist rows`);
+}
+
+// Import summary — multi-row INSERT without transaction (Turso compatible)
 async function importSummary(ws: any, headers: string[], type: string, results: any[], sheetName: string) {
-  const levelCol = headers.findIndex((h) => /уровень|level/i.test(h.trim()));
-  const descCol = headers.findIndex((h) => /описан|description/i.test(h.trim()));
-  const rollersCol = headers.findIndex((h) => /ролик|roller/i.test(h.trim()));
-  const secondsCol = headers.findIndex((h) => /секунд|second|длительн|duration/i.test(h.trim()));
+  const levelCol = headers.findIndex((h) => h && /уровень|level/i.test(h.trim()));
+  const descCol = headers.findIndex((h) => h && /описан|description/i.test(h.trim()));
+  const rollersCol = headers.findIndex((h) => h && /ролик|roller/i.test(h.trim()));
+  const secondsCol = headers.findIndex((h) => h && /секунд|second|длительн|duration/i.test(h.trim()));
 
   let nameCol = 0;
   if (levelCol === 0) nameCol = 1;
 
-  const rows: string[] = [];
+  const BATCH_SIZE = 100;
+  let batchRows: string[] = [];
   let imported = 0;
 
   for (let r = 2; r <= ws.rowCount; r++) {
@@ -227,54 +222,43 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
     const vals: Record<number, string> = {};
     row.eachCell({ includeEmpty: true }, (cell: any, cn: number) => { vals[cn - 1] = cellStr(cell); });
 
-    const name = vals[nameCol] || "";
+    const name = safeStr(vals[nameCol]);
     if (!name) continue;
 
     let level = 1;
     if (levelCol >= 0) {
       level = parseInt(vals[levelCol]) || 1;
     } else {
-      const cell = row.getCell(nameCol + 1);
-      const indent = cell.font?.indent || 0;
-      const bold = cell.font?.bold;
-      if (name.toLowerCase().startsWith("итого")) level = 1;
-      else if (indent === 0 && bold) level = 2;
-      else if (indent >= 2) level = 4;
-      else level = 3;
+      try {
+        const cell = row.getCell(nameCol + 1);
+        const indent = cell?.font?.indent || 0;
+        const bold = cell?.font?.bold;
+        if (name.toLowerCase().startsWith("итого")) level = 1;
+        else if (indent === 0 && bold) level = 2;
+        else if (indent >= 2) level = 4;
+        else level = 3;
+      } catch {
+        level = 1;
+      }
     }
 
-    const description = descCol >= 0 ? vals[descCol] : "";
+    const description = descCol >= 0 ? safeStr(vals[descCol]) : "";
     const rollers = rollersCol >= 0 ? (parseInt(vals[rollersCol]) || 0) : 0;
     const seconds = secondsCol >= 0 ? (parseInt(vals[secondsCol]) || 0) : 0;
     const manual = rollers > 0 || seconds > 0 ? 1 : 0;
 
-    rows.push(`('${escapeSql(type)}',${level},'${escapeSql(name)}','${escapeSql(description)}',NULL,NULL,NULL,${rollers},${seconds},0,${manual},datetime('now'),datetime('now'))`);
+    batchRows.push(`('${escapeSql(type)}',${level},'${escapeSql(name)}','${escapeSql(description)}',NULL,NULL,NULL,${rollers},${seconds},0,${manual},datetime('now'),datetime('now'))`);
     imported++;
-  }
 
-  if (imported === 0) {
-    console.log(`[Import] No summary rows for ${type}`);
-    results.push({ sheet: sheetName, type, rows: 0, kind: "summary" });
-    return;
-  }
-
-  const BATCH_SIZE = 500;
-
-  await db.execute({ sql: `DELETE FROM "PlaylistSummary" WHERE "type" = :type`, args: { type } });
-  await db.execute("BEGIN");
-
-  try {
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE).join(",");
-      await db.execute({
-        sql: `INSERT INTO "PlaylistSummary" ("type","level","categoryName","description","matchField","matchMode","matchValue","rollers","seconds","percent","manualValues","createdAt","updatedAt") VALUES ${batch}`,
-        args: {},
-      });
+    if (batchRows.length >= BATCH_SIZE) {
+      await flushSummaryBatch(type, batchRows);
+      batchRows = [];
     }
-    await db.execute("COMMIT");
-  } catch (e) {
-    await db.execute("ROLLBACK").catch(() => {});
-    throw e;
+  }
+
+  // Flush remaining
+  if (batchRows.length > 0) {
+    await flushSummaryBatch(type, batchRows);
   }
 
   // Apply filter templates from summary-structure.ts
@@ -282,19 +266,12 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
     const { SUMMARY_STRUCTURES } = await import("@/components/dashboard/summary-structure");
     const structure = (SUMMARY_STRUCTURES as any[]).find((s) => s.type === type);
     if (structure) {
-      await db.execute("BEGIN");
-      try {
-        for (const item of structure.items) {
-          if (!item.filter) continue;
-          await db.execute({
-            sql: `UPDATE "PlaylistSummary" SET "matchField"=:mf,"matchMode"=:mm,"matchValue"=:mv WHERE "type"=:type AND "categoryName"=:name`,
-            args: { mf: item.filter.field, mm: item.filter.mode, mv: item.filter.value, type, name: item.name },
-          });
-        }
-        await db.execute("COMMIT");
-      } catch (e) {
-        await db.execute("ROLLBACK").catch(() => {});
-        throw e;
+      for (const item of structure.items) {
+        if (!item.filter) continue;
+        await db.execute({
+          sql: `UPDATE "PlaylistSummary" SET "matchField"=:mf,"matchMode"=:mm,"matchValue"=:mv WHERE "type"=:type AND "categoryName"=:name`,
+          args: { mf: item.filter.field, mm: item.filter.mode, mv: item.filter.value, type, name: item.name },
+        });
       }
     }
   } catch (e) {
@@ -303,4 +280,10 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
 
   console.log(`[Import] Imported ${imported} summary rows for ${type}`);
   results.push({ sheet: sheetName, type, rows: imported, kind: "summary" });
+}
+
+async function flushSummaryBatch(type: string, rows: string[]) {
+  const sql = `INSERT INTO "PlaylistSummary" ("type","level","categoryName","description","matchField","matchMode","matchValue","rollers","seconds","percent","manualValues","createdAt","updatedAt") VALUES ${rows.join(",")}`;
+  await db.execute({ sql, args: {} });
+  console.log(`[Import] Flushed ${rows.length} summary rows`);
 }
