@@ -170,8 +170,8 @@ async function importPlaylist(ws: any, headers: string[], type: string, results:
   }
 
   // Execute as a single transaction with batched INSERT statements
-  const BATCH_SIZE = 200;
-  console.log(`[Import] Inserting ${imported} rows in ${Math.ceil(rows.length / BATCH_SIZE)} batches...`);
+  const BATCH_SIZE = 500;
+  console.log(`[Import] Inserting ${imported} rows in ${Math.ceil(rows.length / BATCH_SIZE)} batches (batch_size=${BATCH_SIZE})...`);
 
   await db.execute({ sql: `DELETE FROM "Playlist" WHERE "type" = :type`, args: { type } });
   await db.execute("BEGIN");
@@ -243,7 +243,7 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
     return;
   }
 
-  const BATCH_SIZE = 200;
+  const BATCH_SIZE = 500;
 
   await db.execute({ sql: `DELETE FROM "PlaylistSummary" WHERE "type" = :type`, args: { type } });
   await db.execute("BEGIN");

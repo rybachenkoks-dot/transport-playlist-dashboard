@@ -61,8 +61,14 @@ export function ImportDialog({ open, onClose, config, onImported }: ImportDialog
 
       let res: Response;
       try {
-        res = await fetch("/api/import", { method: "POST", body: fd });
-      } catch (networkError) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minutes
+        res = await fetch("/api/import", { method: "POST", body: fd, signal: controller.signal });
+        clearTimeout(timeoutId);
+      } catch (networkError: any) {
+        if (networkError?.name === "AbortError") {
+          throw new Error("Превышено время ожидания (5 минут). Попробуйте загрузить файл меньшего размера.");
+        }
         throw new Error("Сетевая ошибка: нет подключения к серверу. Проверьте интернет и попробуйте снова.");
       }
 
@@ -142,7 +148,7 @@ export function ImportDialog({ open, onClose, config, onImported }: ImportDialog
               <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-stone-600 to-stone-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
               </div>
-              <p className="text-xs text-muted-foreground text-center">Импорт данных...</p>
+              <p className="text-xs text-muted-foreground text-center">Импорт данных... Это может занять несколько минут</p>
             </div>
           )}
           {error && (
