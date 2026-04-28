@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Import] Sheets: ${workbook.worksheets.map(w => w.name).join(", ")}`);
 
-    const results: { sheet: string; type: string; rows: number; kind: string }[] = [];
+    const results: { sheet: string; type: string; rows: number; kind: string; error?: string }[] = [];
     let processedSheets = 0;
     const allSheetNames = workbook.worksheets.map(w => w.name);
 
@@ -105,17 +105,21 @@ export async function POST(request: NextRequest) {
           await importSummary(ws, headers, type, results, name);
         }
         processedSheets++;
-      } catch (sheetError) {
-        console.error(`[Import] Error in sheet "${name}":`, sheetError);
-        results.push({ sheet: name, type, rows: 0, kind: isSummary ? "summary" : "playlist" });
+      } catch (sheetError: any) {
+        const errMsg = sheetError instanceof Error ? sheetError.message : String(sheetError);
+        console.error(`[Import] Error in sheet "${name}":`, errMsg);
+        results.push({ sheet: name, type, rows: 0, kind: isSummary ? "summary" : "playlist", error: errMsg });
       }
     }
 
     if (processedSheets === 0 && results.length > 0) {
+      const failedSheets = results.filter(r => r.error).map(r => `${r.sheet}: ${r.error}`);
       return NextResponse.json({
         success: false,
-        error: "Не найдены листы с названиями «Плейлист» или «Свод»",
-        details: `Найденные листы: ${allSheetNames.join(", ")}`,
+        error: "Ошибка при импорте листов",
+        details: failedSheets.length > 0
+          ? failedSheets.join("\n")
+          : `Найденные листы: ${allSheetNames.join(", ")}`,
         results,
       }, { status: 400 });
     }
