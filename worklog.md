@@ -50,3 +50,19 @@ Stage Summary:
 - Импорт Excel полностью работает локально
 - Для исправления на Render.com нужно: проверить TURSO_DATABASE_URL и TURSO_AUTH_TOKEN в Environment Variables
 - Все изменения готовы к деплою
+---
+Task ID: 3
+Agent: main
+Task: Оптимизировать скорость импорта на Render.com + пуш через новый токен
+
+Work Log:
+- Увеличен BATCH_SIZE с 200 до 500 строк для уменьшения количества сетевых round-trip к Turso
+- Добавлен AbortController с таймаутом 5 минут в ImportDialog (предотвращает обрыв больших файлов)
+- Добавлено сообщение "Это может занять несколько минут" при загрузке
+- Настроен git remote origin с новым токеном (REDACTED)
+- Запушены изменения: git push origin HEAD:main --force (commit 64d4921)
+- Render автоматически задеплоит новое приложение
+
+Stage Summary:
+- Импорт оптимизирован: 500 строк/батч вместо 200, таймаут 5 мин
+- Изменения отправлены на GitHub, Render auto-deploy запущен
