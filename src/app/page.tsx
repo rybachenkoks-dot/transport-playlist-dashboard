@@ -2,8 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { FileSpreadsheet, Upload } from "lucide-react";
+import { Upload, Trash2, FileSpreadsheet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { NavigationTabs } from "@/components/dashboard/NavigationTabs";
 import { StatsBar } from "@/components/dashboard/StatsBar";
 import { MarqueeTicker } from "@/components/dashboard/MarqueeTicker";
@@ -25,6 +36,7 @@ export default function Dashboard() {
   const [filters, setFilters] = useState<FilterState>({ location: "", category: "", client: "", search: "", page: 1, limit: 50 });
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -66,10 +78,33 @@ export default function Dashboard() {
   const handleFilterChange = (f: Partial<FilterState>) => setFilters((p) => ({ ...p, ...f, page: 1 }));
   const handleImported = () => { fetchEntries(); fetchStats(); };
 
+  const handleClear = async () => {
+    setClearing(true);
+    try {
+      const res = await fetch("/api/import/clear", { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Удалено: ${data.deletedPlaylists} записей плейлиста, ${data.deletedSummaries} записей сводки`);
+        setEntries([]);
+        setStats(null);
+        setTotal(0);
+        fetchStats();
+      } else {
+        toast.error(data.error || "Ошибка при удалении");
+      }
+    } catch {
+      toast.error("Не удалось удалить данные");
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-stone-50 via-rose-50/30 to-amber-50/20">
       <main className="flex-1 px-4 md:px-6 lg:px-8 py-5 max-w-[1600px] mx-auto w-full space-y-4">
         <NavigationTabs activeType={activeType} onChange={handleTypeChange} />
+
+        {/* Header with stats */}
         <div className="rounded-xl overflow-hidden shadow-md">
           <div className={`bg-gradient-to-r ${config.headerGradient} px-5 py-5 flex items-center justify-between`}>
             <div className="flex items-center gap-3.5">
@@ -90,13 +125,62 @@ export default function Dashboard() {
               <Button variant="ghost" size="sm" onClick={() => setImportOpen(true)} className="h-9 gap-1.5 text-xs rounded-lg text-white/70 hover:text-white hover:bg-white/10">
                 <Upload className="w-4 h-4" /><span className="hidden sm:inline">Импорт</span>
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSummaryOpen(true)} className="h-9 gap-1.5 text-xs rounded-lg text-white/70 hover:text-white hover:bg-white/10">
-                <FileSpreadsheet className="w-4 h-4" /><span className="hidden sm:inline">Свод</span>
-              </Button>
             </div>
           </div>
           <div className="h-0.5 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-500" />
         </div>
+
+        {/* Action buttons row: Свод + Delete */}
+        <div className="flex items-center gap-3">
+          {/* Свод button — prominent */}
+          <button
+            onClick={() => setSummaryOpen(true)}
+            className={`flex items-center gap-2.5 px-5 py-3 rounded-xl bg-gradient-to-r ${config.headerGradient} text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] group`}
+          >
+            <div className="w-8 h-8 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/20 transition-colors">
+              <FileSpreadsheet className="w-4.5 h-4.5" />
+            </div>
+            <div className="text-left">
+              <span className="text-sm font-bold tracking-tight block leading-tight">Свод</span>
+              <span className="text-[10px] text-white/50 font-medium leading-tight block">Аналитика {config.label}</span>
+            </div>
+          </button>
+
+          {/* Delete button */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button className="flex items-center gap-2 px-4 py-3 rounded-xl border border-red-200 bg-white text-red-600 hover:bg-red-50 hover:border-red-300 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-sm group">
+                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <span className="text-sm font-semibold block leading-tight">Очистить всё</span>
+                  <span className="text-[10px] text-red-400 font-medium leading-tight block">Удалить все загрузки</span>
+                </div>
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Удалить все загруженные данные?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Это действие удалит все плейлисты и сводки из базы данных. Данные нельзя будет восстановить.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Отмена</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleClear}
+                  disabled={clearing}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {clearing && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+                  Удалить
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+
         <MarqueeTicker activeType={activeType} config={config} />
         <div className="space-y-3">
           <FiltersPanel filters={filters} stats={stats} config={config} onFilterChange={handleFilterChange} />

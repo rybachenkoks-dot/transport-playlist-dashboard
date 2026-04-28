@@ -80,6 +80,28 @@ export async function POST(request: NextRequest) {
     const results: { sheet: string; type: string; rows: number; kind: string; error?: string }[] = [];
     let processedSheets = 0;
     const allSheetNames = workbook.worksheets.map(w => w.name);
+    
+    // Collect all types that will be imported, then delete existing data for them
+    const typesToImport = new Set<string>();
+    for (const ws of workbook.worksheets) {
+      const name = ws.name;
+      const lower = name.toLowerCase();
+      if (lower.includes("свод") || lower.includes("плейлист")) {
+        const t = detectType(name);
+        if (t) typesToImport.add(t);
+      }
+    }
+    
+    // Delete existing data for all types that will be re-imported
+    for (const t of typesToImport) {
+      try {
+        await db.execute({ sql: `DELETE FROM "Playlist" WHERE "type" = :t`, args: { t } });
+        await db.execute({ sql: `DELETE FROM "PlaylistSummary" WHERE "type" = :t`, args: { t } });
+        console.log(`[Import] Deleted existing data for type: ${t}`);
+      } catch (e) {
+        console.warn(`[Import] Warning: could not delete existing data for ${t}:`, e);
+      }
+    }
 
     for (const ws of workbook.worksheets) {
       const name = ws.name;

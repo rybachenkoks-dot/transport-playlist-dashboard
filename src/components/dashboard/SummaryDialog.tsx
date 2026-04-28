@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,7 +13,7 @@ interface SummaryItem { id: number; level: number; name: string; description: st
 
 function formatDuration(s: number) {
   const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sec = s % 60;
-  if (h > 0) return `${h}h ${m}m ${sec}s`; if (m > 0) return `${m}m ${sec}s`; return `${sec}s`;
+  if (h > 0) return `${h}ч ${m}м ${sec}с`; if (m > 0) return `${m}м ${sec}с`; return `${sec}с`;
 }
 
 export function SummaryDialog({ open, onClose, type, config }: { open: boolean; onClose: () => void; type: PlaylistType; config: PlaylistConfig }) {
@@ -30,7 +30,7 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setItems(data.items || []); setTotalSeconds(data.totalSeconds || 0);
-    } catch (e) { setError(e instanceof Error ? e.message : "Unknown error"); setItems([]); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Неизвестная ошибка"); setItems([]); }
     finally { setLoading(false); }
   }, [type]);
 
@@ -44,31 +44,38 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
             <DialogHeader>
               <DialogTitle className="text-white flex items-center gap-2 text-sm font-semibold">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18M9 6v12M15 6v12" /></svg>
-                {"Summary"} - {config.label}
+                Свод — {config.label}
               </DialogTitle>
             </DialogHeader>
-            <p className="text-[11px] text-white/40 mt-0.5">{items.length} rows / Total: {formatDuration(totalSeconds)} ({totalSeconds}s)</p>
+            <p className="text-[11px] text-white/40 mt-0.5">{items.length} строк / Итого: {formatDuration(totalSeconds)} ({totalSeconds}с)</p>
           </div>
           <Button size="sm" variant="ghost" onClick={() => fetchSummary()} disabled={loading} className="h-8 gap-1 text-xs rounded-lg text-white/70 hover:text-white hover:bg-white/15">
-            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <span>&#8635;</span>} Refresh
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <span>&#8635;</span>} Обновить
           </Button>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {loading ? (
             <div className="p-5 space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-md" />)}</div>
           ) : error ? (
-            <div className="py-16 text-center px-5"><p className="text-destructive text-sm font-medium">Error</p><p className="text-muted-foreground text-xs mt-1">{error}</p><Button variant="outline" size="sm" className="mt-4" onClick={fetchSummary}>Retry</Button></div>
+            <div className="py-16 text-center px-5">
+              <p className="text-destructive text-sm font-medium">Ошибка</p>
+              <p className="text-muted-foreground text-xs mt-1">{error}</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={fetchSummary}>Попробовать снова</Button>
+            </div>
           ) : items.length === 0 ? (
-            <div className="py-16 text-center"><p className="text-muted-foreground text-sm">No data</p><p className="text-muted-foreground text-xs mt-1">Upload via Import button</p></div>
+            <div className="py-16 text-center">
+              <p className="text-muted-foreground text-sm">Нет данных</p>
+              <p className="text-muted-foreground text-xs mt-1">Загрузите данные через кнопку Импорт</p>
+            </div>
           ) : (
             <TooltipProvider delayDuration={300}>
               <Table>
                 <TableHeader>
                   <TableRow className="border-stone-100/40 hover:bg-transparent">
-                    <TableHead className="w-9 text-center text-[11px] font-semibold text-muted-foreground uppercase">Lvl</TableHead>
-                    <TableHead className="min-w-[200px] text-[11px] font-semibold text-muted-foreground uppercase">Category</TableHead>
-                    <TableHead className="w-[70px] text-center text-[11px] font-semibold text-muted-foreground uppercase">Rolls</TableHead>
-                    <TableHead className="w-[70px] text-center text-[11px] font-semibold text-muted-foreground uppercase">Sec</TableHead>
+                    <TableHead className="w-9 text-center text-[11px] font-semibold text-muted-foreground uppercase">Ур.</TableHead>
+                    <TableHead className="min-w-[200px] text-[11px] font-semibold text-muted-foreground uppercase">Категория</TableHead>
+                    <TableHead className="w-[70px] text-center text-[11px] font-semibold text-muted-foreground uppercase">Ролики</TableHead>
+                    <TableHead className="w-[70px] text-center text-[11px] font-semibold text-muted-foreground uppercase">Сек.</TableHead>
                     <TableHead className="w-[55px] text-center text-[11px] font-semibold text-muted-foreground uppercase">%</TableHead>
                   </TableRow>
                 </TableHeader>
