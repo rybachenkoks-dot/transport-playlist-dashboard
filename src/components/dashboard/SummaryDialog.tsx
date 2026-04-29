@@ -169,10 +169,10 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
                 return (
                   <div
                     key={item.id}
-                    className={`grid grid-cols-[1fr_100px_100px_80px] gap-3 px-3 py-2 transition-colors hover:bg-stone-50/80 ${isSection ? "border-b border-stone-100/50" : ""}`}
+                    className={`group/row grid grid-cols-[1fr_100px_100px_80px] gap-3 px-3 py-2 transition-colors hover:bg-stone-50/80 ${isSection ? "border-b border-stone-100/50" : ""}`}
                   >
-                    {/* Name column — hover tooltip on entire cell */}
-                    <div className={`group/row relative flex items-center gap-2 min-w-0 ${desc ? "cursor-help" : ""}`}>
+                    {/* Name column — hover tooltip on entire row */}
+                    <div className={`relative flex items-center gap-2 min-w-0 ${desc ? "cursor-help" : ""}`}>
                       <div style={{ width: `${indent}px`, minWidth: `${indent}px` }} />
                       <div className={`w-1 h-4 rounded-full shrink-0 ${
                         item.level === 2 ? "bg-emerald-400" :
