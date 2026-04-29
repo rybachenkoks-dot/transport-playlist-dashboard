@@ -162,7 +162,7 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
               {items.filter(i => i.level >= 2).map(item => {
                 const isSection = item.level === 2;
                 const indent = (item.level - 2) * 20;
-                const desc = item.description && item.description.trim().length > 0 && item.description !== item.name
+                const desc = item.description && item.description.includes(":")
                   ? item.description.trim()
                   : null;
 
