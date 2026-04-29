@@ -62,6 +62,7 @@ export interface PlaylistConfig {
   subtitle: string;
   locationLabel: string;
   categoryLabel: string;
+  clientLabel: string;
   mediaLabel: string;
   headerGradient: string;
   accentColor: string;
