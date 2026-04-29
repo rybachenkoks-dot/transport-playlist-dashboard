@@ -169,10 +169,10 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
                 return (
                   <div
                     key={item.id}
-                    className={`group/row grid grid-cols-[1fr_100px_100px_80px] gap-3 px-3 py-2 transition-colors hover:bg-stone-50/80 ${isSection ? "border-b border-stone-100/50" : ""}`}
+                    className={`grid grid-cols-[1fr_100px_100px_80px] gap-3 px-3 py-2 transition-colors hover:bg-stone-50/80 ${isSection ? "border-b border-stone-100/50" : ""}`}
                   >
-                    {/* Name column — hover tooltip on entire row */}
-                    <div className={`relative flex items-center gap-2 min-w-0 ${desc ? "cursor-help" : ""}`}>
+                    {/* Name column */}
+                    <div className={`flex items-center gap-2 min-w-0 ${desc ? "cursor-help" : ""}`}>
                       <div style={{ width: `${indent}px`, minWidth: `${indent}px` }} />
                       <div className={`w-1 h-4 rounded-full shrink-0 ${
                         item.level === 2 ? "bg-emerald-400" :
@@ -183,14 +183,13 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
                         {item.name}
                       </span>
                       {desc && (
-                        <Info className="w-4 h-4 text-rose-400 shrink-0" />
-                      )}
-                      {/* Tooltip — appears on hover of the entire name cell */}
-                      {desc && (
-                        <div className="pointer-events-none absolute bottom-full left-2 mb-2 px-3 py-2.5 rounded-lg bg-stone-800 text-white text-[11px] leading-relaxed whitespace-pre-wrap max-w-[440px] min-w-[180px] shadow-xl opacity-0 group-hover/row:opacity-100 transition-opacity duration-200 z-50">
-                          <p className="font-semibold text-[12px] mb-1 text-stone-200">{item.name}</p>
-                          <p className="text-stone-300">{desc}</p>
-                          <div className="absolute top-full left-4 -mt-px w-2 h-2 rotate-45 bg-stone-800" />
+                        <div className="group/tip relative shrink-0">
+                          <Info className="w-4 h-4 text-rose-400" />
+                          <div className="pointer-events-none absolute bottom-full right-0 mb-2 px-3 py-2.5 rounded-lg bg-stone-800 text-white text-[11px] leading-relaxed whitespace-pre-wrap max-w-[440px] min-w-[180px] shadow-xl opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 z-50">
+                            <p className="font-semibold text-[12px] mb-1 text-stone-200">{item.name}</p>
+                            <p className="text-stone-300">{desc}</p>
+                            <div className="absolute top-full right-4 -mt-px w-2 h-2 rotate-45 bg-stone-800" />
+                          </div>
                         </div>
                       )}
                     </div>
