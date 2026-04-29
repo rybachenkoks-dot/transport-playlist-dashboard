@@ -465,8 +465,8 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
       for (const item of structure.items) {
         if (!item.filter) continue;
         await db.execute({
-          sql: `UPDATE "PlaylistSummary" SET "matchField"=:mf,"matchMode"=:mm,"matchValue"=:mv WHERE "type"=:type AND "categoryName"=:name`,
-          args: { mf: item.filter.field, mm: item.filter.mode, mv: item.filter.value, type, name: item.name },
+          sql: `UPDATE "PlaylistSummary" SET "matchField"=:mf,"matchMode"=:mm,"matchValue"=:mv,"description"=:desc WHERE "type"=:type AND "categoryName"=:name`,
+          args: { mf: item.filter.field, mm: item.filter.mode, mv: item.filter.value, desc: item.description || "", type, name: item.name },
         });
       }
     }

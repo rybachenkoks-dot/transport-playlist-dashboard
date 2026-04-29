@@ -123,9 +123,24 @@ export async function GET(request: NextRequest) {
     if (!type) return NextResponse.json({ error: "type required" }, { status: 400 });
     await ensureSeeded(type);
     const result = await db.execute({ sql: `SELECT * FROM "PlaylistSummary" WHERE "type"=:type ORDER BY "id" ASC`, args: { type } });
-    const rows = result.rows;
+    let rows = result.rows;
     if (rows.length === 0) return NextResponse.json({ items: [], totalSeconds: 0, validation: [] });
     const totalSeconds = await getTotalSeconds(type);
+
+    // Sync descriptions from SUMMARY_STRUCTURES template
+    const structure = SUMMARY_STRUCTURES.find((s) => s.type === type);
+    if (structure) {
+      for (const tpl of structure.items) {
+        if (!tpl.description) continue;
+        await db.execute({
+          sql: `UPDATE "PlaylistSummary" SET "description"=:desc WHERE "type"=:type AND "categoryName"=:name AND ("description" IS NULL OR "description"='')`,
+          args: { desc: tpl.description, type, name: tpl.name },
+        });
+      }
+      // Re-fetch to get updated descriptions
+      const refreshed = await db.execute({ sql: `SELECT * FROM "PlaylistSummary" WHERE "type"=:type ORDER BY "id" ASC`, args: { type } });
+      rows = refreshed.rows;
+    }
 
     // Filter out garbage rows from Excel footers
     const garbageRe = /^\*/;
