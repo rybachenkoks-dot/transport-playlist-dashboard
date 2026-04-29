@@ -58,6 +58,29 @@ function escapeSql(str: string): string {
   return str.replace(/'/g, "''");
 }
 
+// Check if a cell contains a formula or unparseable computed cell
+function isFormulaCell(cell: any): boolean {
+  if (!cell || cell.value == null) return false;
+  const v = cell.value;
+  if (typeof v !== "object" || v === null) return false;
+  // Formula cells (COUNTIF, SUMIF, sharedFormula) without cached result
+  if ((v.formula || v.sharedFormula) && v.result === undefined) return true;
+  // Unparseable cells that cellStr converts to "[object Object]"
+  if (!v.richText && !v.text && v.result === undefined && !Number.isFinite(v)) return true;
+  return false;
+}
+
+// Check if all numeric columns in a row are formula cells
+function isFormulaRow(row: any, numericCols: number[]): boolean {
+  if (numericCols.length === 0) return false;
+  let formulaCount = 0;
+  for (const col of numericCols) {
+    const cell = row.getCell(col + 1); // 1-indexed
+    if (isFormulaCell(cell)) formulaCount++;
+  }
+  return formulaCount === numericCols.length;
+}
+
 export async function POST(request: NextRequest) {
   try {
     await ensureTables();
@@ -314,21 +337,38 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
   let batchRows: string[] = [];
   let imported = 0;
 
+  const numericCols = [rollersColIdx, secondsColIdx, percentColIdx].filter(c => c >= 0);
+  const seenNames = new Set<string>(); // dedup by (level, name)
+
   for (let r = dataStartRow; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
-    const vals: Record<number, string> = {};
-    row.eachCell({ includeEmpty: true }, (cell: any, cn: number) => {
-      vals[cn - 1] = cellStr(cell);
-    });
 
-    // Collect text values from name columns (before numeric cols)
+    // Collect raw cell values for name columns
     const nameTexts: { col: number; text: string }[] = [];
     for (let c = 0; c < nameColCount; c++) {
-      const t = safeStr(vals[c]);
+      const cell = row.getCell(c + 1); // 1-indexed
+      const t = cellStr(cell);
       if (t) nameTexts.push({ col: c, text: t });
     }
 
     if (nameTexts.length === 0) continue; // skip empty rows
+
+    // Skip formula-only rows (e.g. COUNTIF/SUMIF at end of sheet)
+    if (isFormulaRow(row, numericCols)) {
+      console.log(`[Import] Skipping formula row ${r}: ${nameTexts.map(n => n.text).join(' ')}`);
+      continue;
+    }
+
+    // Skip footer rows like "*количество повторов"
+    if (nameTexts.some(n => n.text.startsWith('*') || n.text.toLowerCase().startsWith('количество повторов'))) {
+      continue;
+    }
+
+    // Read numeric values (after formula check)
+    const vals: Record<number, string> = {};
+    row.eachCell({ includeEmpty: true }, (cell: any, cn: number) => {
+      vals[cn - 1] = cellStr(cell);
+    });
 
     // Determine level: which column has the text?
     // C0 = level 1 (итого) or level 2 (section)
@@ -358,11 +398,39 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
       name = firstText.text;
     }
 
-    const rollers = rollersColIdx >= 0 ? (parseInt(vals[rollersColIdx]) || 0) : 0;
-    const seconds = secondsColIdx >= 0 ? (parseInt(vals[secondsColIdx]) || 0) : 0;
-    let percent = 0;
+    // Dedup check: skip if (level, name) already seen
+    const dedupKey = `${level}:${name}`;
+    if (seenNames.has(dedupKey)) {
+      console.log(`[Import] Skipping duplicate row ${r}: [${type}] ${name} (level ${level})`);
+      continue;
+    }
+    seenNames.add(dedupKey);
+
+    // Get numeric values — try cell.result first (for formula cells with cached values)
+    let rollers = 0, seconds = 0, percent = 0;
+    if (rollersColIdx >= 0) {
+      const cell = row.getCell(rollersColIdx + 1);
+      if (cell && cell.value && typeof cell.value === 'object' && cell.value.result !== undefined) {
+        rollers = parseInt(String(cell.value.result)) || 0;
+      } else {
+        rollers = parseInt(vals[rollersColIdx]) || 0;
+      }
+    }
+    if (secondsColIdx >= 0) {
+      const cell = row.getCell(secondsColIdx + 1);
+      if (cell && cell.value && typeof cell.value === 'object' && cell.value.result !== undefined) {
+        seconds = parseInt(String(cell.value.result)) || 0;
+      } else {
+        seconds = parseInt(vals[secondsColIdx]) || 0;
+      }
+    }
     if (percentColIdx >= 0) {
-      percent = parseFloat(String(vals[percentColIdx]).replace("%", "").replace(",", ".")) || 0;
+      const cell = row.getCell(percentColIdx + 1);
+      if (cell && cell.value && typeof cell.value === 'object' && cell.value.result !== undefined) {
+        percent = parseFloat(String(cell.value.result).replace("%", "").replace(",", ".")) || 0;
+      } else {
+        percent = parseFloat(String(vals[percentColIdx]).replace("%", "").replace(",", ".")) || 0;
+      }
     }
     const manual = rollers > 0 || seconds > 0 ? 1 : 0;
 
@@ -395,6 +463,27 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
     }
   } catch (e) {
     console.warn("[Import] Template match warning:", e);
+  }
+
+  // Self-check: remove any remaining duplicates (same type + level + categoryName)
+  try {
+    const dupResult = await db.execute({
+      sql: `SELECT "categoryName", "level", COUNT(*) as cnt FROM "PlaylistSummary" WHERE "type"=:type GROUP BY "type","level","categoryName" HAVING cnt > 1`,
+      args: { type },
+    });
+    for (const dup of dupResult.rows) {
+      const dupName = String(dup.categoryName);
+      const dupLevel = Number(dup.level);
+      const cnt = Number(dup.cnt);
+      console.log(`[Import] Dedup: removing ${cnt - 1} duplicate(s) of "${dupName}" (level ${dupLevel})`);
+      // Delete all but the first (lowest id)
+      await db.execute({
+        sql: `DELETE FROM "PlaylistSummary" WHERE "id" NOT IN (SELECT MIN("id") FROM "PlaylistSummary" WHERE "type"=:type AND "level"=:lvl AND "categoryName"=:name) AND "type"=:type AND "level"=:lvl AND "categoryName"=:name`,
+        args: { type, lvl: dupLevel, name: dupName },
+      });
+    }
+  } catch (e) {
+    console.warn("[Import] Dedup check warning:", e);
   }
 
   console.log(`[Import] Imported ${imported} summary rows for ${type}`);
