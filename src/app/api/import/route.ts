@@ -466,28 +466,36 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
   }
 
   // Self-check: remove any remaining duplicates (same type + level + categoryName)
+  // Uses simple approach: fetch all rows, find duplicates by (level, categoryName), delete extras
+  const validationWarnings: string[] = [];
   try {
-    const dupResult = await db.execute({
-      sql: `SELECT "categoryName", "level", COUNT(*) as cnt FROM "PlaylistSummary" WHERE "type"=:type GROUP BY "type","level","categoryName" HAVING cnt > 1`,
+    const allRows = await db.execute({
+      sql: `SELECT "id", "level", "categoryName" FROM "PlaylistSummary" WHERE "type"=:type ORDER BY "id" ASC`,
       args: { type },
     });
-    for (const dup of dupResult.rows) {
-      const dupName = String(dup.categoryName);
-      const dupLevel = Number(dup.level);
-      const cnt = Number(dup.cnt);
-      console.log(`[Import] Dedup: removing ${cnt - 1} duplicate(s) of "${dupName}" (level ${dupLevel})`);
-      // Delete all but the first (lowest id)
-      await db.execute({
-        sql: `DELETE FROM "PlaylistSummary" WHERE "id" NOT IN (SELECT MIN("id") FROM "PlaylistSummary" WHERE "type"=:type AND "level"=:lvl AND "categoryName"=:name) AND "type"=:type AND "level"=:lvl AND "categoryName"=:name`,
-        args: { type, lvl: dupLevel, name: dupName },
-      });
+    const seen = new Map<string, number[]>(); // key: "level:name" -> [id1, id2, ...]
+    for (const row of allRows.rows) {
+      const key = `${row.level}:${row.categoryName}`;
+      if (!seen.has(key)) seen.set(key, []);
+      seen.get(key)!.push(Number(row.id));
+    }
+    for (const [key, ids] of seen) {
+      if (ids.length <= 1) continue;
+      const [lvl, ...nameParts] = key.split(":");
+      const name = nameParts.join(":");
+      validationWarnings.push(`Дубликат: "${name}" (уровень ${lvl}) — удалено ${ids.length - 1} копий`);
+      console.log(`[Import] Dedup: removing ${ids.length - 1} duplicate(s) of "${name}" (level ${lvl}), keeping id=${ids[0]}`);
+      // Delete all but the first
+      for (let d = 1; d < ids.length; d++) {
+        await db.execute({ sql: `DELETE FROM "PlaylistSummary" WHERE "id"=:id`, args: { id: ids[d] } });
+      }
     }
   } catch (e) {
     console.warn("[Import] Dedup check warning:", e);
   }
 
-  console.log(`[Import] Imported ${imported} summary rows for ${type}`);
-  results.push({ sheet: sheetName, type, rows: imported, kind: "summary" });
+  console.log(`[Import] Imported ${imported} summary rows for ${type} (${validationWarnings.length} warnings)`);
+  results.push({ sheet: sheetName, type, rows: imported, kind: "summary", validation: validationWarnings.length > 0 ? validationWarnings : undefined });
 }
 
 async function flushSummaryBatch(type: string, rows: string[]) {

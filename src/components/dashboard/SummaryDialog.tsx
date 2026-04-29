@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Info, Clock, Film } from "lucide-react";
+import { Info, Clock, Film, AlertTriangle, ShieldCheck } from "lucide-react";
 import type { PlaylistType, PlaylistConfig } from "./types";
 
 interface SummaryItem {
@@ -12,6 +12,12 @@ interface SummaryItem {
   rollers: number; seconds: number; percent: number;
   isSection: boolean; manualValues: boolean;
   children?: SummaryItem[];
+}
+
+interface ValidationIssue {
+  severity: "error" | "warning";
+  message: string;
+  details?: string;
 }
 
 function formatDuration(s: number) {
@@ -36,6 +42,8 @@ function TooltipBadge({ text }: { text: string }) {
 export function SummaryDialog({ open, onClose, type, config }: { open: boolean; onClose: () => void; type: PlaylistType; config: PlaylistConfig }) {
   const [items, setItems] = useState<SummaryItem[]>([]);
   const [totalSeconds, setTotalSeconds] = useState(0);
+  const [validation, setValidation] = useState<ValidationIssue[]>([]);
+  const [showValidation, setShowValidation] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const prevOpen = useRef(false);
@@ -48,6 +56,7 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
       const data = await res.json();
       setItems(data.items || []);
       setTotalSeconds(data.totalSeconds || 0);
+      setValidation(data.validation || []);
     } catch (e) { setError(e instanceof Error ? e.message : "Неизвестная ошибка"); setItems([]); }
     finally { setLoading(false); }
   }, [type]);
@@ -55,6 +64,8 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
   useEffect(() => { if (open && !prevOpen.current) fetchSummary(); prevOpen.current = open; }, [open, fetchSummary]);
 
   const totalItem = items.find(i => i.level === 1);
+  const errors = validation.filter(v => v.severity === "error");
+  const warnings = validation.filter(v => v.severity === "warning");
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -67,10 +78,53 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
               Свод — {config.label}
             </DialogTitle>
           </DialogHeader>
-          <p className="text-[11px] text-white/50 mt-0.5">
-            {totalSeconds > 0 ? `Итого: ${formatDuration(totalSeconds)}` : "Нет данных"}
-          </p>
+          <div className="flex items-center justify-between mt-0.5">
+            <p className="text-[11px] text-white/50">
+              {totalSeconds > 0 ? `Итого: ${formatDuration(totalSeconds)}` : "Нет данных"}
+            </p>
+            {validation.length > 0 && (
+              <button
+                onClick={() => setShowValidation(!showValidation)}
+                className="flex items-center gap-1 text-[11px] text-white/70 hover:text-white transition-colors"
+              >
+                {errors.length > 0 ? (
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-300" />
+                ) : (
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                )}
+                <span>{errors.length > 0 ? `${errors.length} ошибок` : `${warnings.length} замечаний`}</span>
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Validation panel */}
+        {showValidation && validation.length > 0 && (
+          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-200/60 shrink-0">
+            <p className="text-[11px] font-semibold text-amber-700 mb-1.5">Проверка данных</p>
+            <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+              {validation.map((v, idx) => (
+                <div key={idx} className="flex items-start gap-1.5 text-[11px]">
+                  {v.severity === "error" ? (
+                    <AlertTriangle className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-3 h-3 text-amber-500 mt-0.5 shrink-0" />
+                  )}
+                  <div>
+                    <span className={v.severity === "error" ? "text-red-700" : "text-amber-700"}>{v.message}</span>
+                    {v.details && <span className="text-amber-600 block text-[10px] mt-0.5">{v.details}</span>}
+                  </div>
+                </div>
+              ))}
+              {validation.length === 0 && (
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-600">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Данные корректны, проблем не обнаружено</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
