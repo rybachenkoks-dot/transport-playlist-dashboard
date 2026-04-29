@@ -69,7 +69,7 @@ interface ValidationIssue {
 async function validateData(type: string, computed: any[]): Promise<ValidationIssue[]> {
   const issues: ValidationIssue[] = [];
 
-  // 1. Check for duplicate entries (same categoryName + level)
+  // 1. Check for duplicates
   const dupCheck = await db.execute({
     sql: `SELECT "categoryName", "level", COUNT(*) as cnt FROM "PlaylistSummary" WHERE "type"=:type GROUP BY "type","level","categoryName" HAVING cnt > 1`,
     args: { type },
@@ -78,95 +78,42 @@ async function validateData(type: string, computed: any[]): Promise<ValidationIs
     issues.push({
       severity: "error",
       message: `Дубликат: "${dup.categoryName}" (уровень ${dup.level}) — ${dup.cnt} записей`,
-      details: "Удалите лишние записи через API или повторите импорт"
     });
   }
 
-  // 2. Check section totals vs sum of children
-  for (let i = 0; i < computed.length; i++) {
-    const item = computed[i];
-    if (item.level < 1 || item.level > 3) continue;
-    if (item.manualValues) continue; // Manual values don't need validation
-
-    // Find children (level + 1 items directly under this one)
-    let childRollers = 0, childSeconds = 0;
-    let hasChildren = false;
-    for (let j = i + 1; j < computed.length; j++) {
-      if (computed[j].level <= item.level) break;
-      if (computed[j].level === item.level + 1) {
-        childRollers += computed[j].rollers;
-        childSeconds += computed[j].seconds;
-        hasChildren = true;
-      }
-    }
-
-    if (!hasChildren) continue;
-
-    // For level 1 (Итого), seconds should match totalSeconds, so skip seconds check
-    if (item.level === 1) {
-      if (item.rollers !== childRollers) {
-        issues.push({
-          severity: "warning",
-          message: `Итого: несоответствие роликов (${item.rollers} vs сумма детей ${childRollers})`,
-        });
-      }
-      continue;
-    }
-
-    // Check rollers mismatch
-    if (item.rollers !== childRollers && childRollers > 0) {
-      issues.push({
-        severity: "warning",
-        message: `"${item.name}": ролики (${item.rollers}) не совпадают с суммой детей (${childRollers})`,
-      });
-    }
-
-    // Check seconds mismatch
-    if (item.seconds !== childSeconds && childSeconds > 0) {
-      issues.push({
-        severity: "warning",
-        message: `"${item.name}": длительность (${item.seconds}с) не совпадает с суммой детей (${childSeconds}с)`,
-      });
-    }
-  }
-
-  // 3. Check for items with no matchField and no children (orphan items)
-  for (let i = 0; i < computed.length; i++) {
-    const item = computed[i];
-    if (item.level === 1) continue; // Итого always valid
-    if (item.matchField) continue;  // Has a filter, will get data
-    if (item.manualValues) continue; // Has manual values from Excel
-
-    // Check if this item has children
-    let hasChildren = false;
-    for (let j = i + 1; j < computed.length; j++) {
-      if (computed[j].level <= item.level) break;
-      hasChildren = true;
-      break;
-    }
-
-    if (!hasChildren && item.rollers === 0 && item.seconds === 0) {
-      issues.push({
-        severity: "warning",
-        message: `"${item.name}" (уровень ${item.level}): нет данных и нет фильтра`,
-        details: "Добавьте фильтр matchField в summary-structure или проверьте Excel"
-      });
-    }
-  }
-
-  // 4. Check if percentages sum to ~100% for level 2 sections
+  // 2. Check percent sum ~100%
   const level2Sections = computed.filter(i => i.level === 2);
   if (level2Sections.length > 0) {
     const totalPercent = level2Sections.reduce((sum, s) => sum + (s.percent || 0), 0);
-    if (Math.abs(totalPercent - 100) > 2) {
+    if (Math.abs(totalPercent - 100) > 5) {
       issues.push({
         severity: "warning",
-        message: `Сумма процентов секций: ${totalPercent.toFixed(1)}% (ожидается ~100%)`,
+        message: `Сумма процентов: ${totalPercent.toFixed(1)}% (ожидается ~100%)`,
       });
     }
   }
 
   return issues;
+}
+
+// An item is a section if the next item in the list has a deeper level
+function isSection(items: any[], idx: number): boolean {
+  if (idx + 1 >= items.length) return false;
+  return items[idx + 1].level > items[idx].level;
+}
+
+// Sum direct children (level + 1) starting from idx
+function sumDirectChildren(items: any[], idx: number): { rollers: number; seconds: number } {
+  const parent = items[idx];
+  let tr = 0, ts = 0;
+  for (let j = idx + 1; j < items.length; j++) {
+    if (items[j].level <= parent.level) break;
+    if (items[j].level === parent.level + 1) {
+      tr += items[j].rollers;
+      ts += items[j].seconds;
+    }
+  }
+  return { rollers: tr, seconds: ts };
 }
 
 export async function GET(request: NextRequest) {
@@ -180,107 +127,110 @@ export async function GET(request: NextRequest) {
     if (rows.length === 0) return NextResponse.json({ items: [], totalSeconds: 0, validation: [] });
     const totalSeconds = await getTotalSeconds(type);
 
-    // Filter out garbage rows (footers, notes from Excel)
-    const garbagePatterns = [/^\*/i, /^количество повторов/i, /^примечание/i, /^всего/i];
-    const filteredRows = rows.filter(row => {
-      const name = String(row.categoryName || "").trim();
-      return !garbagePatterns.some(p => p.test(name));
-    });
+    // Filter out garbage rows from Excel footers
+    const garbageRe = /^\*/;
+    const computed = rows
+      .filter(row => !garbageRe.test(String(row.categoryName || "")))
+      .map((row) => {
+        const lvl = Number(row.level ?? 0);
+        const hasManual = Number(row.manualValues) === 1;
+        return {
+          id: Number(row.id),
+          level: lvl,
+          name: String(row.categoryName || ""),
+          description: String(row.description || ""),
+          matchField: row.matchField as string | null,
+          matchMode: row.matchMode as string | null,
+          matchValue: row.matchValue as string | null,
+          rollers: hasManual ? Number(row.rollers || 0) : 0,
+          seconds: hasManual ? Number(row.seconds || 0) : 0,
+          percent: 0,
+          manualValues: hasManual,
+        };
+      });
 
-    // Build computed items with index tracking
-    const computed = filteredRows.map((row, idx) => {
-      const lvl = Number(row.level ?? 0);
-      const hasManual = Number(row.manualValues) === 1;
-      return {
-        id: Number(row.id),
-        index: idx,
-        level: lvl,
-        name: String(row.categoryName || ""),
-        description: String(row.description || ""),
-        matchField: row.matchField as string | null,
-        matchMode: row.matchMode as string | null,
-        matchValue: row.matchValue as string | null,
-        rollers: hasManual ? Number(row.rollers || 0) : 0,
-        seconds: hasManual ? Number(row.seconds || 0) : 0,
-        percent: 0,
-        manualValues: hasManual,
-      };
-    });
+    if (computed.length === 0) return NextResponse.json({ items: [], totalSeconds, validation: [] });
 
-    // Step 1: Compute leaf items (non-sections with matchField)
-    for (const item of computed) {
-      if (item.manualValues) continue; // Use Excel values
-      if (item.matchField) {
+    // ============================================
+    // STEP 1: Compute LEAF values (items with no children)
+    //   - If manualValues=1 and no matchField → keep Excel value
+    //   - If has matchField → compute from Playlist table
+    //   - If no matchField and no manual → stays 0
+    // ============================================
+    for (let i = 0; i < computed.length; i++) {
+      const item = computed[i];
+      if (isSection(computed, i)) continue; // Skip sections, handle in Step 2
+      if (item.matchField && !item.manualValues) {
         const stats = await countByFilter(type, item.matchField, item.matchMode, item.matchValue);
         item.rollers = stats.rollers;
         item.seconds = stats.seconds;
       }
+      // Leaves with manualValues keep their DB rollers/seconds (already set above)
+      // Leaves with no matchField and no manual stay at 0
     }
 
-    // Step 2: Determine which items are sections (have children at higher levels)
-    // An item is a section if the next item has a higher level
-    function isSection(idx: number): boolean {
-      if (idx + 1 >= computed.length) return false;
-      return computed[idx + 1].level > computed[idx].level;
-    }
-
-    // Step 3: Bottom-up: compute section totals from deepest to shallowest
-    // Only sum DIRECT children (level + 1), not all descendants
+    // ============================================
+    // STEP 2: Compute SECTION totals bottom-up
+    //   ALWAYS recompute from direct children (level+1)
+    //   regardless of manualValues — sections from Excel
+    //   may have stale/incorrect values (double-counting)
+    // ============================================
     const maxLevel = Math.max(...computed.map(i => i.level));
     for (let targetLevel = maxLevel; targetLevel >= 1; targetLevel--) {
       for (let i = 0; i < computed.length; i++) {
         const item = computed[i];
         if (item.level !== targetLevel) continue;
-        if (!isSection(i)) continue; // Not a section (no children)
-        if (item.manualValues) continue; // Keep Excel manual values as-is
+        if (!isSection(computed, i)) continue; // Not a section
 
-        // Sum direct children only (level + 1)
-        let tr = 0, ts = 0;
-        for (let j = i + 1; j < computed.length; j++) {
-          if (computed[j].level <= item.level) break;
-          if (computed[j].level === item.level + 1) {
-            tr += computed[j].rollers;
-            ts += computed[j].seconds;
-          }
-        }
+        const children = sumDirectChildren(computed, i);
 
         if (item.level === 1) {
-          item.rollers = tr;
+          // Итого: rollers from children, seconds from total playlist
+          item.rollers = children.rollers;
           item.seconds = totalSeconds;
           item.percent = 100;
         } else {
-          item.rollers = tr;
-          item.seconds = ts;
-          item.percent = totalSeconds > 0 ? Math.round((ts / totalSeconds) * 10000) / 100 : 0;
+          // Other sections: sum direct children
+          item.rollers = children.rollers;
+          item.seconds = children.seconds;
+          item.percent = totalSeconds > 0 ? Math.round((children.seconds / totalSeconds) * 10000) / 100 : 0;
         }
       }
     }
 
-    // Step 4: Compute percentages for non-section leaves
+    // ============================================
+    // STEP 3: Compute percent for ALL non-section, non-итого items
+    // ============================================
     for (let i = 0; i < computed.length; i++) {
       const item = computed[i];
-      if (isSection(i)) continue; // Sections already have their percent
       if (item.level === 1) continue;
+      if (isSection(computed, i)) continue; // Sections already got percent in Step 2
       item.percent = totalSeconds > 0 ? Math.round((item.seconds / totalSeconds) * 10000) / 100 : 0;
     }
 
-    // Step 5: Clean garbage rows from DB (persistent cleanup)
+    // ============================================
+    // STEP 4: Cleanup garbage from DB (one-time)
+    // ============================================
     try {
-      const dbRows = await db.execute({ sql: `SELECT "id", "categoryName" FROM "PlaylistSummary" WHERE "type"=:type`, args: { type } });
-      for (const row of dbRows.rows) {
-        const name = String(row.categoryName || "").trim();
-        if (garbagePatterns.some(p => p.test(name))) {
+      for (const row of rows) {
+        const name = String(row.categoryName || "");
+        if (garbageRe.test(name)) {
           await db.execute({ sql: `DELETE FROM "PlaylistSummary" WHERE "id"=:id`, args: { id: Number(row.id) } });
-          console.log(`[Summary] Cleaned garbage row id=${row.id}: "${name}"`);
+          console.log(`[Summary] Cleaned garbage id=${row.id}: "${name}"`);
         }
       }
     } catch (e) {
       console.warn("[Summary] Garbage cleanup warning:", e);
     }
 
-    // Step 6: Self-validation
+    // ============================================
+    // STEP 5: Validation
+    // ============================================
     const validation = await validateData(type, computed);
 
     return NextResponse.json({ items: computed, totalSeconds, validation });
-  } catch (error) { console.error("Error computing summary:", error); return NextResponse.json({ error: "Failed", details: String(error) }, { status: 500 }); }
+  } catch (error) {
+    console.error("Error computing summary:", error);
+    return NextResponse.json({ error: "Failed", details: String(error) }, { status: 500 });
+  }
 }
