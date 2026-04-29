@@ -184,7 +184,7 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
                       </span>
                       {desc && (
                         <div className="group/tip relative shrink-0">
-                          <Info className="w-4 h-4 text-rose-400" />
+                          <Info className="w-3.5 h-3.5 text-stone-300" />
                           <div className="pointer-events-none absolute bottom-full right-0 mb-2 px-3 py-2.5 rounded-lg bg-stone-800 text-white text-[11px] leading-relaxed whitespace-pre-wrap max-w-[440px] min-w-[180px] shadow-xl opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 z-50">
                             <p className="text-stone-300">{desc}</p>
                             <div className="absolute top-full right-4 -mt-px w-2 h-2 rotate-45 bg-stone-800" />
