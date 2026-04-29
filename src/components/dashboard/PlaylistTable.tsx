@@ -32,17 +32,17 @@ export function PlaylistTable({ entries, loading, total, page, totalPages, confi
         <Table>
           <TableHeader>
             <TableRow className="border-stone-100/40 hover:bg-transparent">
-              <TableHead className="w-14 text-center text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">#</TableHead>
+              <TableHead className="w-14 text-center text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">№</TableHead>
               <TableHead className="min-w-[120px] text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{config.locationLabel}</TableHead>
               <TableHead className="min-w-[110px] text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{config.categoryLabel}</TableHead>
-              <TableHead className="min-w-[150px] text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Client</TableHead>
+              <TableHead className="min-w-[150px] text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{config.clientLabel}</TableHead>
               <TableHead className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{config.mediaLabel}</TableHead>
-              <TableHead className="w-[80px] text-center text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Dur</TableHead>
+              <TableHead className="w-[80px] text-center text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Сек.</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-16"><p className="text-muted-foreground text-sm">No records</p><p className="text-muted-foreground text-xs mt-1">Upload via Import button</p></TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-16"><p className="text-muted-foreground text-sm">Нет записей</p><p className="text-muted-foreground text-xs mt-1">Загрузите через кнопку Импорт</p></TableCell></TableRow>
             ) : (
               entries.map((entry) => {
                 const catStyle = CATEGORY_STYLES[entry.category.trim()];
