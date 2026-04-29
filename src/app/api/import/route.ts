@@ -359,8 +359,17 @@ async function importSummary(ws: any, headers: string[], type: string, results: 
       continue;
     }
 
-    // Skip footer rows like "*количество повторов"
-    if (nameTexts.some(n => n.text.startsWith('*') || n.text.toLowerCase().startsWith('количество повторов'))) {
+    // Skip footer/metadata rows from Excel
+    const allText = nameTexts.map(n => n.text).join(' ');
+    const lowerAll = allText.toLowerCase();
+    if (allText.startsWith('*') ||
+        lowerAll.startsWith('количество повторов') ||
+        lowerAll.startsWith('примечание') ||
+        lowerAll.startsWith('всего') ||
+        lowerAll.includes('повтор всех роликов') ||
+        lowerAll.includes('средняя длительность') ||
+        lowerAll.includes('примечани')) {
+      console.log(`[Import] Skipping footer row ${r}: "${allText.substring(0, 60)}"`);
       continue;
     }
 

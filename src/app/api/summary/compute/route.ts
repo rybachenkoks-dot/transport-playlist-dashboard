@@ -180,8 +180,15 @@ export async function GET(request: NextRequest) {
     if (rows.length === 0) return NextResponse.json({ items: [], totalSeconds: 0, validation: [] });
     const totalSeconds = await getTotalSeconds(type);
 
+    // Filter out garbage rows (footers, notes from Excel)
+    const garbagePatterns = [/^\*/i, /^количество повторов/i, /^примечание/i, /^всего/i];
+    const filteredRows = rows.filter(row => {
+      const name = String(row.categoryName || "").trim();
+      return !garbagePatterns.some(p => p.test(name));
+    });
+
     // Build computed items with index tracking
-    const computed = rows.map((row, idx) => {
+    const computed = filteredRows.map((row, idx) => {
       const lvl = Number(row.level ?? 0);
       const hasManual = Number(row.manualValues) === 1;
       return {
@@ -257,7 +264,21 @@ export async function GET(request: NextRequest) {
       item.percent = totalSeconds > 0 ? Math.round((item.seconds / totalSeconds) * 10000) / 100 : 0;
     }
 
-    // Step 5: Self-validation
+    // Step 5: Clean garbage rows from DB (persistent cleanup)
+    try {
+      const dbRows = await db.execute({ sql: `SELECT "id", "categoryName" FROM "PlaylistSummary" WHERE "type"=:type`, args: { type } });
+      for (const row of dbRows.rows) {
+        const name = String(row.categoryName || "").trim();
+        if (garbagePatterns.some(p => p.test(name))) {
+          await db.execute({ sql: `DELETE FROM "PlaylistSummary" WHERE "id"=:id`, args: { id: Number(row.id) } });
+          console.log(`[Summary] Cleaned garbage row id=${row.id}: "${name}"`);
+        }
+      }
+    } catch (e) {
+      console.warn("[Summary] Garbage cleanup warning:", e);
+    }
+
+    // Step 6: Self-validation
     const validation = await validateData(type, computed);
 
     return NextResponse.json({ items: computed, totalSeconds, validation });
