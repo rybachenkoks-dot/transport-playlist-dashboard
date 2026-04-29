@@ -25,20 +25,6 @@ function formatDuration(s: number) {
   if (h > 0) return `${h}ч ${m}м`; if (m > 0) return `${m}м ${sec}с`; return `${sec}с`;
 }
 
-function TooltipBadge({ text }: { text: string }) {
-  return (
-    <div className="group/badge relative inline-flex">
-      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200/60 cursor-help transition-colors hover:bg-rose-100">
-        <Info className="w-3 h-3 text-rose-500" />
-      </div>
-      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-stone-800 text-white text-[11px] leading-relaxed whitespace-pre-wrap max-w-[420px] min-w-[200px] shadow-xl opacity-0 group-hover/badge:opacity-100 transition-opacity duration-200 z-50">
-        {text}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px w-2 h-2 rotate-45 bg-stone-800" />
-      </div>
-    </div>
-  );
-}
-
 export function SummaryDialog({ open, onClose, type, config }: { open: boolean; onClose: () => void; type: PlaylistType; config: PlaylistConfig }) {
   const [items, setItems] = useState<SummaryItem[]>([]);
   const [totalSeconds, setTotalSeconds] = useState(0);
@@ -176,15 +162,17 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
               {items.filter(i => i.level >= 2).map(item => {
                 const isSection = item.level === 2;
                 const indent = (item.level - 2) * 20;
-                const hasTooltip = item.description && item.description.trim().length > 0 && item.description !== item.name;
+                const desc = item.description && item.description.trim().length > 0 && item.description !== item.name
+                  ? item.description.trim()
+                  : null;
 
                 return (
                   <div
                     key={item.id}
                     className={`grid grid-cols-[1fr_100px_100px_80px] gap-3 px-3 py-2 transition-colors hover:bg-stone-50/80 ${isSection ? "border-b border-stone-100/50" : ""}`}
                   >
-                    {/* Name column with indent */}
-                    <div className="flex items-center gap-2 min-w-0">
+                    {/* Name column — hover tooltip on entire cell */}
+                    <div className={`group/row relative flex items-center gap-2 min-w-0 ${desc ? "cursor-help" : ""}`}>
                       <div style={{ width: `${indent}px`, minWidth: `${indent}px` }} />
                       <div className={`w-1 h-4 rounded-full shrink-0 ${
                         item.level === 2 ? "bg-emerald-400" :
@@ -194,7 +182,17 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
                       <span className={`text-[13px] leading-tight truncate ${isSection ? "font-semibold text-stone-800" : "text-stone-600"}`}>
                         {item.name}
                       </span>
-                      {hasTooltip && <TooltipBadge text={item.description} />}
+                      {desc && (
+                        <Info className="w-3 h-3 text-rose-400 shrink-0 opacity-60 group-hover/row:opacity-100 transition-opacity" />
+                      )}
+                      {/* Tooltip — appears on hover of the entire name cell */}
+                      {desc && (
+                        <div className="pointer-events-none absolute bottom-full left-2 mb-2 px-3 py-2.5 rounded-lg bg-stone-800 text-white text-[11px] leading-relaxed whitespace-pre-wrap max-w-[440px] min-w-[180px] shadow-xl opacity-0 group-hover/row:opacity-100 transition-opacity duration-200 z-50">
+                          <p className="font-semibold text-[12px] mb-1 text-stone-200">{item.name}</p>
+                          <p className="text-stone-300">{desc}</p>
+                          <div className="absolute top-full left-4 -mt-px w-2 h-2 rotate-45 bg-stone-800" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Rollers — right-aligned */}
