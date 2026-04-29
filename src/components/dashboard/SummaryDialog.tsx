@@ -183,7 +183,7 @@ export function SummaryDialog({ open, onClose, type, config }: { open: boolean; 
                         {item.name}
                       </span>
                       {desc && (
-                        <Info className="w-3 h-3 text-rose-400 shrink-0 opacity-60 group-hover/row:opacity-100 transition-opacity" />
+                        <Info className="w-4 h-4 text-rose-400 shrink-0" />
                       )}
                       {/* Tooltip — appears on hover of the entire name cell */}
                       {desc && (
